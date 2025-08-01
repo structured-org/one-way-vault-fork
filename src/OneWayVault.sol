@@ -104,6 +104,16 @@ contract OneWayVault is
     }
 
     /**
+     * @dev Restricts function access to only wrapper
+     */
+    modifier onlyWrapper() {
+        if (msg.sender != config.wrapper) {
+            revert("Only wrapper allowed");
+        }
+        _;
+    }
+
+    /**
      * @dev Ensures the vault is not paused
      */
     modifier whenNotPaused() {
@@ -127,6 +137,7 @@ contract OneWayVault is
      * @dev Configuration structure for the vault
      * @param depositAccount Account where deposits are held
      * @param strategist Address of the vault strategist
+     * @param wrapper Address of wrapper, the only account allowed to execute deposit() and withdraw()
      * @param depositFeeBps Fee charged on deposits in basis points (1 BPS = 0.01%)
      * @param withdrawFeeBps Fee charged on withdrawals in basis points (1 BPS = 0.01%)
      * @param maxRateIncrementBps Maximum allowed relative increase in redemption rate per update (in basis points).
@@ -141,6 +152,7 @@ contract OneWayVault is
     struct OneWayVaultConfig {
         BaseAccount depositAccount;
         address strategist;
+        address wrapper;
         uint32 depositFeeBps;
         uint32 withdrawFeeBps;
         uint32 maxRateIncrementBps;
@@ -390,7 +402,7 @@ contract OneWayVault is
      * @param receiver Address to receive the vault shares
      * @return shares Amount of shares minted to receiver
      */
-    function deposit(uint256 assets, address receiver) public override whenNotPaused nonReentrant returns (uint256) {
+    function deposit(uint256 assets, address receiver) public override onlyWrapper whenNotPaused nonReentrant returns (uint256) {
         if (_checkAndHandleStaleRate()) {
             return 0; // Exit early if vault was just paused
         }
@@ -593,7 +605,7 @@ contract OneWayVault is
      * @param receiver Address to receive the withdrawn assets on the destination domain (as string)
      * @param owner Address that owns the shares
      */
-    function withdraw(uint256 assets, string calldata receiver, address owner) external nonReentrant whenNotPaused {
+    function withdraw(uint256 assets, string calldata receiver, address owner) external onlyWrapper nonReentrant whenNotPaused {
         if (_checkAndHandleStaleRate()) {
             return; // Exit early if vault was just paused
         }

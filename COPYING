@@ -3,3 +3,5 @@ SPDX-License-Identifier: Apache-2.0
 
 Modifications by Structured:
 - stripped unused dependencies
+- added deployment scripts and docs
+- added new configuration parameter: wrapper
