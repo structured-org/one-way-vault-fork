@@ -1,0 +1,21 @@
+[profile.default]
+src  = "src"
+out  = "out"
+libs = ["dependencies"]
+# Enable IR pipeline to support complex memory-to-storage copying (required for array of structs)
+viaIR     = true
+optimizer = true
+
+# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+[dependencies]
+forge-std                             = "1.9.4"
+"@openzeppelin-contracts"             = "5.2.0"
+"@openzeppelin-contracts-upgradeable" = "5.2.0"
+
+[rpc_endpoints]
+ethereum = "${ETHEREUM_RPC_URL}"
+sepolia = "${SEPOLIA_RPC_URL}"
+ 
+[etherscan]
+ethereum = { key = "${ETHERSCAN_API_KEY}" }
+sepolia = { key = "${ETHERSCAN_API_KEY}" }

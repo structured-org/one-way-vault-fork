@@ -1,0 +1,21 @@
+# macOS
+.DS_Store
+
+# IDEs
+.vscode/
+.idea/
+*.iml
+**/.editorconfig
+
+# Compiler files
+cache/
+out/
+bin/
+
+# Soldeer
+dependencies
+
+# Forge
+broadcast/
+
+.env
