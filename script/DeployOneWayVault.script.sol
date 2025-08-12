@@ -1,3 +1,4 @@
+// Copyright Structured
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.28;
 
@@ -15,15 +16,14 @@ contract DeployOneWayVaultScript is Script {
         address underlyingToken = vm.envAddress("UNDERLYING_TOKEN");
         address depositAccount = vm.envAddress("DEPOSIT_ACCOUNT");
         address strategist = vm.envAddress("STRATEGIST");
-        address wrapper = vm.envAddress("WRAPPER");
         address platform = vm.envAddress("PLATFORM");
         uint256 strategistRatioBps = vm.envOr("STRATEGIST_RATIO_BPS", uint256(0));
-        uint256 depositFeeBps = vm.envOr("DEPOSIT_FEE_BPS", uint256(0)); // TODO: is it a good default?
-        uint256 withdrawFeeBps = vm.envOr("WITHDRAW_FEE_BPS", uint256(0)); // TODO: is it a good default?
-        uint256 maxRateIncrementBps = vm.envOr("MAX_RATE_INCREMENT_BPS", uint256(0)); // TODO: is it a good default?
-        uint256 maxRateDecrementBps = vm.envOr("MAX_RATE_DECREMENT_BPS", uint256(0)); // TODO: is it a good default?
-        uint256 minRateUpdateDelay = vm.envOr("MIN_RATE_UPDATE_DELAY", uint256(0)); // TODO: is it a good default?
-        uint256 maxRateUpdateDelay = vm.envOr("MAX_RATE_UPDATE_DELAY", uint256(1)); // TODO: is it a good default?
+        uint256 depositFeeBps = vm.envOr("DEPOSIT_FEE_BPS", uint256(0));
+        uint256 withdrawFeeBps = vm.envOr("WITHDRAW_FEE_BPS", uint256(0));
+        uint256 maxRateIncrementBps = vm.envOr("MAX_RATE_INCREMENT_BPS", uint256(10000));
+        uint256 maxRateDecrementBps = vm.envOr("MAX_RATE_DECREMENT_BPS", uint256(5000));
+        uint256 minRateUpdateDelay = vm.envOr("MIN_RATE_UPDATE_DELAY", uint256(0));
+        uint256 maxRateUpdateDelay = vm.envOr("MAX_RATE_UPDATE_DELAY", uint256(86400));
         uint256 depositCap = vm.envOr("DEPOSIT_CAP", uint256(0));
         string memory vaultTokenName = vm.envString("VAULT_TOKEN_NAME");
         string memory vaultTokenSymbol = vm.envString("VAULT_TOKEN_SYMBOL");
@@ -40,7 +40,7 @@ contract DeployOneWayVaultScript is Script {
         OneWayVault.OneWayVaultConfig memory config = OneWayVault.OneWayVaultConfig({
             depositAccount: BaseAccount(payable(address(depositAccount))),
             strategist: strategist,
-            wrapper: wrapper,
+            wrapper: address(0),
             depositFeeBps: uint32(depositFeeBps),
             withdrawFeeBps: uint32(withdrawFeeBps),
             maxRateIncrementBps: uint32(maxRateIncrementBps),
@@ -70,7 +70,7 @@ contract DeployOneWayVaultScript is Script {
         console.log("  Owner:                 ", owner);
         console.log("  Deposit account:       ", depositAccount);
         console.log("  Strategist:            ", strategist);
-        console.log("  Wrapper:               ", wrapper);
+        console.log("  Wrapper:               ", address(0));
         console.log("  Deposit fee BPS:       ", depositFeeBps);
         console.log("  Withdraw fee BPS:      ", withdrawFeeBps);
         console.log("  Max rate increment BPS:", maxRateIncrementBps);
