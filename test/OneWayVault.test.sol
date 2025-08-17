@@ -11,6 +11,7 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 import {Wrapper} from "../src/Wrapper.sol";
 import {IERC20Errors} from "@openzeppelin-contracts-5.2.0/interfaces/draft-IERC6093.sol";
 import {ERC4626Upgradeable} from "@openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import {OneWayVaultHelpers} from "../lib/OneWayVault.lib.sol";
 
 contract OneWayVaultTest is Test {
     address constant OWNER = address(1);
@@ -20,6 +21,7 @@ contract OneWayVaultTest is Test {
     address constant USER = address(5);
 
     ERC20Mock underlyingToken;
+    BaseAccount depositAccount;
     ZkMeMock zkMe;
     OneWayVault vault;
     Wrapper wrapper;
@@ -33,7 +35,7 @@ contract OneWayVaultTest is Test {
         OneWayVault implementation = new OneWayVault();
 
         // README step 3
-        BaseAccount depositAccount = new BaseAccount(OWNER, new address[](0));
+        depositAccount = new BaseAccount(OWNER, new address[](0));
 
         // README step 4
         OneWayVault.FeeDistributionConfig memory feeConfig = OneWayVault.FeeDistributionConfig({
@@ -86,6 +88,7 @@ contract OneWayVaultTest is Test {
 
         assertEq(vault.balanceOf(USER), 100);
         assertEq(underlyingToken.balanceOf(USER), 900);
+        assertEq(underlyingToken.balanceOf(address(depositAccount)), 100);
     }
 
     function testDepositSuccessKycZkMe() public {
@@ -98,6 +101,7 @@ contract OneWayVaultTest is Test {
 
         assertEq(vault.balanceOf(USER), 100);
         assertEq(underlyingToken.balanceOf(USER), 900);
+        assertEq(underlyingToken.balanceOf(address(depositAccount)), 100);
     }
 
     function testDepositSuccessKycWrapperAndZkMe() public {
@@ -166,24 +170,8 @@ contract OneWayVaultTest is Test {
     }
 
     function testDepositFailureNoWrapper() public {
-        OneWayVault.FeeDistributionConfig memory feeConfig = OneWayVault.FeeDistributionConfig({
-            strategistAccount: STRATEGIST,
-            platformAccount: PLATFORM,
-            strategistRatioBps: uint32(0)
-        });
-        OneWayVault.OneWayVaultConfig memory config = OneWayVault.OneWayVaultConfig({
-            depositAccount: BaseAccount(payable(address(new BaseAccount(OWNER, new address[](0))))),
-            strategist: STRATEGIST,
-            wrapper: address(0),
-            depositFeeBps: uint32(0),
-            withdrawFeeBps: uint32(0),
-            maxRateIncrementBps: uint32(0),
-            maxRateDecrementBps: uint32(0),
-            minRateUpdateDelay: uint64(0),
-            maxRateUpdateDelay: uint64(1),
-            depositCap: uint256(0),
-            feeDistribution: feeConfig
-        });
+        OneWayVault.OneWayVaultConfig memory config = OneWayVaultHelpers.getConfig(vault);
+        config.wrapper = address(0);
         vault.updateConfig(abi.encode(config));
 
         underlyingToken.transfer(USER, 1000);
@@ -341,24 +329,8 @@ contract OneWayVaultTest is Test {
         vault.approve(address(wrapper), 100);
 
         vm.startPrank(OWNER);
-        OneWayVault.FeeDistributionConfig memory feeConfig = OneWayVault.FeeDistributionConfig({
-            strategistAccount: STRATEGIST,
-            platformAccount: PLATFORM,
-            strategistRatioBps: uint32(0)
-        });
-        OneWayVault.OneWayVaultConfig memory config = OneWayVault.OneWayVaultConfig({
-            depositAccount: BaseAccount(payable(address(new BaseAccount(OWNER, new address[](0))))),
-            strategist: STRATEGIST,
-            wrapper: address(0),
-            depositFeeBps: uint32(0),
-            withdrawFeeBps: uint32(0),
-            maxRateIncrementBps: uint32(0),
-            maxRateDecrementBps: uint32(0),
-            minRateUpdateDelay: uint64(0),
-            maxRateUpdateDelay: uint64(1),
-            depositCap: uint256(0),
-            feeDistribution: feeConfig
-        });
+        OneWayVault.OneWayVaultConfig memory config = OneWayVaultHelpers.getConfig(vault);
+        config.wrapper = address(0);
         vault.updateConfig(abi.encode(config));
         vm.startPrank(USER);
 
@@ -384,5 +356,27 @@ contract OneWayVaultTest is Test {
 
         vm.expectRevert("Only wrapper allowed");
         vault.withdraw(100, "test_receiver", USER);
+    }
+
+    function testDepositCapOverflow() public {
+        OneWayVault.OneWayVaultConfig memory config = OneWayVaultHelpers.getConfig(vault);
+        config.depositCap = 200;
+        vault.updateConfig(abi.encode(config));
+
+        underlyingToken.transfer(USER, 1000);
+        wrapper.allowUser(USER);
+
+        vm.startPrank(USER);
+        underlyingToken.approve(address(wrapper), 1000);
+
+        wrapper.deposit(150, USER);
+
+        vm.expectRevert(abi.encodeWithSelector(ERC4626Upgradeable.ERC4626ExceededMaxDeposit.selector, USER, 100, 50));
+        wrapper.deposit(100, USER);
+
+        wrapper.deposit(50, USER);
+
+        vm.expectRevert(abi.encodeWithSelector(ERC4626Upgradeable.ERC4626ExceededMaxDeposit.selector, USER, 20, 0));
+        wrapper.deposit(20, USER);
     }
 }
