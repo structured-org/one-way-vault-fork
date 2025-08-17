@@ -1,0 +1,388 @@
+// Copyright Structured
+// SPDX-License-Identifier: Apache-2.0
+pragma solidity ^0.8.28;
+
+import {Test} from "forge-std/src/Test.sol";
+import {OneWayVault} from "../src/OneWayVault.sol";
+import {BaseAccount} from "../src/BaseAccount.sol";
+import {ERC20Mock} from "../src/mock/ERC20Mock.sol";
+import {ZkMeMock} from "../src/mock/ZkMeMock.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {Wrapper} from "../src/Wrapper.sol";
+import {IERC20Errors} from "@openzeppelin-contracts-5.2.0/interfaces/draft-IERC6093.sol";
+import {ERC4626Upgradeable} from "@openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+
+contract OneWayVaultTest is Test {
+    address constant OWNER = address(1);
+    address constant STRATEGIST = address(2);
+    address constant PLATFORM = address(3);
+    address constant COOPERATOR = address(4);
+    address constant USER = address(5);
+
+    ERC20Mock underlyingToken;
+    ZkMeMock zkMe;
+    OneWayVault vault;
+    Wrapper wrapper;
+
+    function setUp() public {
+        vm.startPrank(OWNER);
+        underlyingToken = new ERC20Mock();
+        zkMe = new ZkMeMock();
+
+        // README step 2
+        OneWayVault implementation = new OneWayVault();
+
+        // README step 3
+        BaseAccount depositAccount = new BaseAccount(OWNER, new address[](0));
+
+        // README step 4
+        OneWayVault.FeeDistributionConfig memory feeConfig = OneWayVault.FeeDistributionConfig({
+            strategistAccount: STRATEGIST,
+            platformAccount: PLATFORM,
+            strategistRatioBps: uint32(0)
+        });
+        OneWayVault.OneWayVaultConfig memory config = OneWayVault.OneWayVaultConfig({
+            depositAccount: BaseAccount(payable(address(depositAccount))),
+            strategist: STRATEGIST,
+            wrapper: address(0),
+            depositFeeBps: uint32(0),
+            withdrawFeeBps: uint32(0),
+            maxRateIncrementBps: uint32(0),
+            maxRateDecrementBps: uint32(0),
+            minRateUpdateDelay: uint64(0),
+            maxRateUpdateDelay: uint64(1),
+            depositCap: uint256(0),
+            feeDistribution: feeConfig
+        });
+        bytes memory initializeCall = abi.encodeCall(OneWayVault.initialize, (
+            OWNER,
+            abi.encode(config),
+            address(underlyingToken),
+            "vTEST",
+            "vSYMBOL",
+            10 ** underlyingToken.decimals()
+        ));
+        ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initializeCall);
+        vault = OneWayVault(address(proxy));
+
+        // README step 5
+        depositAccount.approveLibrary(address(vault));
+
+        // README step 6
+        wrapper = new Wrapper(OWNER, address(vault), address(zkMe), COOPERATOR, true);
+
+        // README step 7
+        config.wrapper = address(wrapper);
+        vault.updateConfig(abi.encode(config));
+    }
+
+    function testDepositSuccessKycWrapper() public {
+        underlyingToken.transfer(USER, 1000);
+        wrapper.allowUser(USER);
+
+        vm.startPrank(USER);
+        underlyingToken.approve(address(wrapper), 100);
+        wrapper.deposit(100, USER);
+
+        assertEq(vault.balanceOf(USER), 100);
+        assertEq(underlyingToken.balanceOf(USER), 900);
+    }
+
+    function testDepositSuccessKycZkMe() public {
+        underlyingToken.transfer(USER, 1000);
+        zkMe.setApproved(COOPERATOR, USER, true);
+
+        vm.startPrank(USER);
+        underlyingToken.approve(address(wrapper), 100);
+        wrapper.deposit(100, USER);
+
+        assertEq(vault.balanceOf(USER), 100);
+        assertEq(underlyingToken.balanceOf(USER), 900);
+    }
+
+    function testDepositSuccessKycWrapperAndZkMe() public {
+        underlyingToken.transfer(USER, 1000);
+        wrapper.allowUser(USER);
+        zkMe.setApproved(COOPERATOR, USER, true);
+
+        vm.startPrank(USER);
+        underlyingToken.approve(address(wrapper), 100);
+        wrapper.deposit(100, USER);
+
+        assertEq(vault.balanceOf(USER), 100);
+        assertEq(underlyingToken.balanceOf(USER), 900);
+    }
+
+    function testDepositFailureNoFunds() public {
+        wrapper.allowUser(USER);
+
+        vm.startPrank(USER);
+        underlyingToken.approve(address(wrapper), 100);
+
+        vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientBalance.selector, USER, 0, 100));
+        wrapper.deposit(100, USER);
+    }
+
+    function testDepositFailureNotEnoughFunds() public {
+        underlyingToken.transfer(USER, 50);
+        wrapper.allowUser(USER);
+
+        vm.startPrank(USER);
+        underlyingToken.approve(address(wrapper), 100);
+
+        vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientBalance.selector, USER, 50, 100));
+        wrapper.deposit(100, USER);
+    }
+
+    function testDepositFailureNoAllowance() public {
+        underlyingToken.transfer(USER, 50);
+        wrapper.allowUser(USER);
+
+        vm.startPrank(USER);
+
+        vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, address(wrapper), 0, 100));
+        wrapper.deposit(100, USER);
+    }
+
+    function testDepositFailureNotEnoughAllowance() public {
+        underlyingToken.transfer(USER, 50);
+        wrapper.allowUser(USER);
+
+        vm.startPrank(USER);
+        underlyingToken.approve(address(wrapper), 50);
+
+        vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, address(wrapper), 50, 100));
+        wrapper.deposit(100, USER);
+    }
+
+    function testDepositFailureKyc() public {
+        underlyingToken.transfer(USER, 100);
+
+        vm.startPrank(USER);
+        underlyingToken.approve(address(wrapper), 100);
+
+        vm.expectRevert(Wrapper.KycFailed.selector);
+        wrapper.deposit(100, USER);
+    }
+
+    function testDepositFailureNoWrapper() public {
+        OneWayVault.FeeDistributionConfig memory feeConfig = OneWayVault.FeeDistributionConfig({
+            strategistAccount: STRATEGIST,
+            platformAccount: PLATFORM,
+            strategistRatioBps: uint32(0)
+        });
+        OneWayVault.OneWayVaultConfig memory config = OneWayVault.OneWayVaultConfig({
+            depositAccount: BaseAccount(payable(address(new BaseAccount(OWNER, new address[](0))))),
+            strategist: STRATEGIST,
+            wrapper: address(0),
+            depositFeeBps: uint32(0),
+            withdrawFeeBps: uint32(0),
+            maxRateIncrementBps: uint32(0),
+            maxRateDecrementBps: uint32(0),
+            minRateUpdateDelay: uint64(0),
+            maxRateUpdateDelay: uint64(1),
+            depositCap: uint256(0),
+            feeDistribution: feeConfig
+        });
+        vault.updateConfig(abi.encode(config));
+
+        underlyingToken.transfer(USER, 1000);
+        wrapper.allowUser(USER);
+
+        vm.startPrank(USER);
+        underlyingToken.approve(address(wrapper), 100);
+
+        vm.expectRevert("Only wrapper allowed");
+        wrapper.deposit(100, USER);
+    }
+
+    function testWithdrawSuccessKycWrapper() public {
+        underlyingToken.transfer(USER, 1000);
+        wrapper.allowUser(USER);
+
+        vm.startPrank(USER);
+        underlyingToken.approve(address(wrapper), 100);
+        wrapper.deposit(100, USER);
+        vault.approve(address(wrapper), 100);
+        wrapper.withdraw(100, "test_receiver");
+
+        (uint64 id,
+         address owner,
+         uint256 redemptionRate,
+         uint256 sharesAmount,
+         string memory receiver
+        ) = vault.withdrawRequests(0);
+        assertEq(id, 0);
+        assertEq(owner, USER);
+        assertEq(redemptionRate, 10 ** 18);
+        assertEq(sharesAmount, 100);
+        assertEq(receiver, "test_receiver");
+    }
+
+    function testWithdrawSuccessKycZkMe() public {
+        underlyingToken.transfer(USER, 1000);
+        zkMe.setApproved(COOPERATOR, USER, true);
+
+        vm.startPrank(USER);
+        underlyingToken.approve(address(wrapper), 100);
+        wrapper.deposit(100, USER);
+        vault.approve(address(wrapper), 100);
+        wrapper.withdraw(100, "test_receiver");
+
+        (uint64 id,
+         address owner,
+         uint256 redemptionRate,
+         uint256 sharesAmount,
+         string memory receiver
+        ) = vault.withdrawRequests(0);
+        assertEq(id, 0);
+        assertEq(owner, USER);
+        assertEq(redemptionRate, 10 ** 18);
+        assertEq(sharesAmount, 100);
+        assertEq(receiver, "test_receiver");
+    }
+
+    function testWithdrawSuccessKycWrapperAndZkMe() public {
+        underlyingToken.transfer(USER, 1000);
+        wrapper.allowUser(USER);
+        zkMe.setApproved(COOPERATOR, USER, true);
+
+        vm.startPrank(USER);
+        underlyingToken.approve(address(wrapper), 100);
+        wrapper.deposit(100, USER);
+        vault.approve(address(wrapper), 100);
+        wrapper.withdraw(100, "test_receiver");
+
+        (uint64 id,
+         address owner,
+         uint256 redemptionRate,
+         uint256 sharesAmount,
+         string memory receiver
+        ) = vault.withdrawRequests(0);
+        assertEq(id, 0);
+        assertEq(owner, USER);
+        assertEq(redemptionRate, 10 ** 18);
+        assertEq(sharesAmount, 100);
+        assertEq(receiver, "test_receiver");
+    }
+
+    function testWithdrawFailureNoFunds() public {
+        wrapper.allowUser(USER);
+
+        vm.startPrank(USER);
+        vault.approve(address(wrapper), 100);
+
+        vm.expectRevert(abi.encodeWithSelector(ERC4626Upgradeable.ERC4626ExceededMaxWithdraw.selector, USER, 100, 0));
+        wrapper.withdraw(100, "test_receiver");
+    }
+
+    function testWithdrawFailureNotEnoughFunds() public {
+        underlyingToken.transfer(USER, 1000);
+        wrapper.allowUser(USER);
+
+        vm.startPrank(USER);
+        underlyingToken.approve(address(wrapper), 20);
+        wrapper.deposit(20, USER);
+        vault.approve(address(wrapper), 100);
+
+        vm.expectRevert(abi.encodeWithSelector(ERC4626Upgradeable.ERC4626ExceededMaxWithdraw.selector, USER, 100, 20));
+        wrapper.withdraw(100, "test_receiver");
+    }
+
+    function testWithdrawFailureNoALlowance() public {
+        underlyingToken.transfer(USER, 1000);
+        wrapper.allowUser(USER);
+
+        vm.startPrank(USER);
+        underlyingToken.approve(address(wrapper), 100);
+        wrapper.deposit(100, USER);
+
+        vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, address(wrapper), 0, 100));
+        wrapper.withdraw(100, "test_receiver");
+    }
+
+    function testWithdrawFailureNotEnoughAllowance() public {
+        underlyingToken.transfer(USER, 1000);
+        wrapper.allowUser(USER);
+
+        vm.startPrank(USER);
+        underlyingToken.approve(address(wrapper), 100);
+        wrapper.deposit(100, USER);
+        vault.approve(address(wrapper), 20);
+
+        vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, address(wrapper), 20, 100));
+        wrapper.withdraw(100, "test_receiver");
+    }
+
+    function testWithdrawFailureKyc() public {
+        underlyingToken.transfer(USER, 1000);
+        wrapper.allowUser(USER);
+
+        vm.startPrank(USER);
+        underlyingToken.approve(address(wrapper), 100);
+        wrapper.deposit(100, USER);
+        vault.approve(address(wrapper), 100);
+
+        vm.startPrank(OWNER);
+        wrapper.removeUser(USER);
+        vm.startPrank(USER);
+
+        vm.expectRevert(Wrapper.KycFailed.selector);
+        wrapper.withdraw(100, "test_receiver");
+    }
+
+    function testWithdrawFailureNoWrapper() public {
+        underlyingToken.transfer(USER, 1000);
+        wrapper.allowUser(USER);
+
+        vm.startPrank(USER);
+        underlyingToken.approve(address(wrapper), 100);
+        wrapper.deposit(100, USER);
+        vault.approve(address(wrapper), 100);
+
+        vm.startPrank(OWNER);
+        OneWayVault.FeeDistributionConfig memory feeConfig = OneWayVault.FeeDistributionConfig({
+            strategistAccount: STRATEGIST,
+            platformAccount: PLATFORM,
+            strategistRatioBps: uint32(0)
+        });
+        OneWayVault.OneWayVaultConfig memory config = OneWayVault.OneWayVaultConfig({
+            depositAccount: BaseAccount(payable(address(new BaseAccount(OWNER, new address[](0))))),
+            strategist: STRATEGIST,
+            wrapper: address(0),
+            depositFeeBps: uint32(0),
+            withdrawFeeBps: uint32(0),
+            maxRateIncrementBps: uint32(0),
+            maxRateDecrementBps: uint32(0),
+            minRateUpdateDelay: uint64(0),
+            maxRateUpdateDelay: uint64(1),
+            depositCap: uint256(0),
+            feeDistribution: feeConfig
+        });
+        vault.updateConfig(abi.encode(config));
+        vm.startPrank(USER);
+
+        vm.expectRevert("Only wrapper allowed");
+        wrapper.withdraw(100, "test_receiver");
+    }
+
+    function testVaultDirectDepositForbidden() public {
+        underlyingToken.transfer(USER, 1000);
+
+        vm.startPrank(USER);
+        vm.expectRevert("Only wrapper allowed");
+        vault.deposit(100, USER);
+    }
+
+    function testVaultDirectWithdrawForbidden() public {
+        underlyingToken.transfer(USER, 1000);
+        wrapper.allowUser(USER);
+
+        vm.startPrank(USER);
+        underlyingToken.approve(address(wrapper), 100);
+        wrapper.deposit(100, USER);
+
+        vm.expectRevert("Only wrapper allowed");
+        vault.withdraw(100, "test_receiver", USER);
+    }
+}
