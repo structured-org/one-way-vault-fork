@@ -66,12 +66,9 @@ contract OneWayVaultTest is Test {
         vault = OneWayVault(address(proxy));
 
         // README step 5
-        depositAccount.approveLibrary(address(vault));
-
-        // README step 6
         wrapper = new Wrapper(OWNER, address(vault), address(zkMe), COOPERATOR, true);
 
-        // README step 7
+        // README step 6
         config.wrapper = address(wrapper);
         vault.updateConfig(abi.encode(config));
     }

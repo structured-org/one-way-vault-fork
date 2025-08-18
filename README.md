@@ -40,13 +40,7 @@ Optionally, you might specify the following environment variables, too:
 - `DEPOSIT_CAP` is a limit of assets to be deposited (default: 0 or unlimited);
 - `STARTING_RATE` is a starting exchange rate (default is calculated on underlying token's decimals and is equal 1.0).
 
-## Step 5. Allow OneWayVault to interact with BaseAccount
-
-Run `cast send "<BaseAccount>" "approveLibrary(address)" "<OneWayVault>" --rpc-url "$ETHEREUM_RPC_URL" --private-key "$ETHEREUM_PRIVATE_KEY"`, where:
-- `BaseAccount` is the address of the `BaseAccount` contract deployed in step 3;
-- `OneWayVault` is the address of the `OneWayVault` contract deployed in step 4.
-
-## Step 6. Deploy Wrapper
+## Step 5. Deploy Wrapper
 
 Run `OWNER="" VAULT="" ZK_ME="" COOPERATOR="" WITHDRAWS_ENABLED="" forge script script/DeployWrapper.script.sol --rpc-url "$ETHEREUM_RPC_URL" --private-key "$ETHEREUM_PRIVATE_KEY" --broadcast --verify -vvvv`, where:
 - `OWNER` must be set to account address, which will become a `Wrapper` admin;
@@ -59,7 +53,7 @@ Run `OWNER="" VAULT="" ZK_ME="" COOPERATOR="" WITHDRAWS_ENABLED="" forge script 
 
 Run `VAULT="" WRAPPER="" forge script script/UpdateOneWayVaultWrapper.script.sol --rpc-url "$ETHEREUM_RPC_URL" --private-key "$ETHEREUM_PRIVATE_KEY" --broadcast -vvvv`, where:
 - `VAULT` must be set to proxy `OneWayVault` address deployed in step 4;
-- `WRAPPER` must be set to contract `Wrapper` address deployed in step 6.
+- `WRAPPER` must be set to contract `Wrapper` address deployed in step 5.
 
 ## Ownership transfer instructions
 
