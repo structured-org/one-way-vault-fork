@@ -63,8 +63,26 @@ Run `VAULT="" WRAPPER="" forge script script/UpdateOneWayVaultWrapper.script.sol
 
 ## Ownership transfer instructions
 
-TODO.
+After deploying the vault, one might want to transfer vault ownership to some secure account, like a multisig. In order to do that, the owner must call `transferOwnership(address)` and pass a new owner address. Keep in mind that the ownership will be transferred immediately, so there is no room for mistakes.
 
 # Usage instructions
 
+Users are expected to interact with the vault through `Wrapper` contract. There are two operations available:
+
+## Deposit
+
+When depositing, users exchange underlying asset for a vault asset using current redemption rate. For example, when current redemption rate is 2.0, users get back two times less tokens than they deposit. In order to perform a deposit, users must first allow the Wrapper contract to use their tokens via a standard ERC-20 `approve(address, uint256)` function:
+
+```solidity
+underlyingToken.approve(WRAPPER_ADDRESS, amount_of_tokens_to_deposit);
+```
+
+Once the allowance is configured, users shall call the wrapper: `deposit(uint256, address)`, with the first argument being the amount of tokens to deposit and the second argument being the receiver address (normally, that would be user address).
+
+## Withdraw
+
 TODO.
+
+# Redemption rate instructions
+
+`STRATEGIST` account is an automated bot which must update redemption rate regularly to prevent the vault from pausing itself. In order to do so, it must call the `update(uint256)` function. The argument is an exchange rate against the underlying asset. For example, if 1 vault token costs 2 underlying tokens, and there are 6 decimals, then the exchange rate equals to `2/1 * 10**6` or `2000000`, that means the `STRATEGIST` must execute `update(2000000)`.
