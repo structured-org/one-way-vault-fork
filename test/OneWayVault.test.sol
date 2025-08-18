@@ -181,56 +181,9 @@ contract OneWayVaultTest is Test {
         wrapper.deposit(100, USER);
     }
 
-    function testWithdrawSuccessKycWrapper() public {
+    function testWithdrawSuccess() public {
         underlyingToken.transfer(USER, 1000);
         wrapper.allowUser(USER);
-
-        vm.startPrank(USER);
-        underlyingToken.approve(address(wrapper), 100);
-        wrapper.deposit(100, USER);
-        vault.approve(address(wrapper), 100);
-        wrapper.withdraw(100, "test_receiver");
-
-        (uint64 id,
-         address owner,
-         uint256 redemptionRate,
-         uint256 sharesAmount,
-         string memory receiver
-        ) = vault.withdrawRequests(0);
-        assertEq(id, 0);
-        assertEq(owner, USER);
-        assertEq(redemptionRate, 10 ** 18);
-        assertEq(sharesAmount, 100);
-        assertEq(receiver, "test_receiver");
-    }
-
-    function testWithdrawSuccessKycZkMe() public {
-        underlyingToken.transfer(USER, 1000);
-        zkMe.setApproved(COOPERATOR, USER, true);
-
-        vm.startPrank(USER);
-        underlyingToken.approve(address(wrapper), 100);
-        wrapper.deposit(100, USER);
-        vault.approve(address(wrapper), 100);
-        wrapper.withdraw(100, "test_receiver");
-
-        (uint64 id,
-         address owner,
-         uint256 redemptionRate,
-         uint256 sharesAmount,
-         string memory receiver
-        ) = vault.withdrawRequests(0);
-        assertEq(id, 0);
-        assertEq(owner, USER);
-        assertEq(redemptionRate, 10 ** 18);
-        assertEq(sharesAmount, 100);
-        assertEq(receiver, "test_receiver");
-    }
-
-    function testWithdrawSuccessKycWrapperAndZkMe() public {
-        underlyingToken.transfer(USER, 1000);
-        wrapper.allowUser(USER);
-        zkMe.setApproved(COOPERATOR, USER, true);
 
         vm.startPrank(USER);
         underlyingToken.approve(address(wrapper), 100);
@@ -296,23 +249,6 @@ contract OneWayVaultTest is Test {
         vault.approve(address(wrapper), 20);
 
         vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, address(wrapper), 20, 100));
-        wrapper.withdraw(100, "test_receiver");
-    }
-
-    function testWithdrawFailureKyc() public {
-        underlyingToken.transfer(USER, 1000);
-        wrapper.allowUser(USER);
-
-        vm.startPrank(USER);
-        underlyingToken.approve(address(wrapper), 100);
-        wrapper.deposit(100, USER);
-        vault.approve(address(wrapper), 100);
-
-        vm.startPrank(OWNER);
-        wrapper.removeUser(USER);
-        vm.startPrank(USER);
-
-        vm.expectRevert(Wrapper.KycFailed.selector);
         wrapper.withdraw(100, "test_receiver");
     }
 

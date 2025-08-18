@@ -63,7 +63,7 @@ contract Wrapper is Ownable {
         return vault.deposit(assets, receiver);
     }
 
-    function withdraw(uint256 assets, string calldata receiver) external onlyKyc {
+    function withdraw(uint256 assets, string calldata receiver) external {
         if (!withdrawsEnabled) {
             revert WithdrawsDisabled();
         }
