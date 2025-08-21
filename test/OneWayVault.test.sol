@@ -38,6 +38,9 @@ contract OneWayVaultTest is Test {
         depositAccount = new BaseAccount(OWNER, new address[](0));
 
         // README step 4
+        wrapper = new Wrapper(OWNER);
+
+        // README step 5
         OneWayVault.FeeDistributionConfig memory feeConfig = OneWayVault.FeeDistributionConfig({
             strategistAccount: STRATEGIST,
             platformAccount: PLATFORM,
@@ -46,7 +49,7 @@ contract OneWayVaultTest is Test {
         OneWayVault.OneWayVaultConfig memory config = OneWayVault.OneWayVaultConfig({
             depositAccount: BaseAccount(payable(address(depositAccount))),
             strategist: STRATEGIST,
-            wrapper: address(0),
+            wrapper: address(wrapper),
             depositFeeBps: uint32(0),
             withdrawFeeBps: uint32(0),
             maxRateIncrementBps: uint32(0),
@@ -67,12 +70,8 @@ contract OneWayVaultTest is Test {
         ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initializeCall);
         vault = OneWayVault(address(proxy));
 
-        // README step 5
-        wrapper = new Wrapper(OWNER, address(vault), address(zkMe), COOPERATOR, true);
-
         // README step 6
-        config.wrapper = address(wrapper);
-        vault.updateConfig(abi.encode(config));
+        wrapper.setConfig(address(vault), address(zkMe), COOPERATOR, true);
     }
 
     function testDepositSuccessKycWrapper() public {
@@ -166,21 +165,6 @@ contract OneWayVaultTest is Test {
         wrapper.deposit(100, USER);
     }
 
-    function testDepositFailureNoWrapper() public {
-        OneWayVault.OneWayVaultConfig memory config = OneWayVaultHelpers.getConfig(vault);
-        config.wrapper = address(0);
-        vault.updateConfig(abi.encode(config));
-
-        underlyingToken.transfer(USER, 1000);
-        wrapper.allowUser(USER);
-
-        vm.startPrank(USER);
-        underlyingToken.approve(address(wrapper), 100);
-
-        vm.expectRevert("Only wrapper allowed");
-        wrapper.deposit(100, USER);
-    }
-
     function testWithdrawSuccess() public {
         underlyingToken.transfer(USER, 1000);
         wrapper.allowUser(USER);
@@ -252,25 +236,6 @@ contract OneWayVaultTest is Test {
         wrapper.withdraw(100, "test_receiver");
     }
 
-    function testWithdrawFailureNoWrapper() public {
-        underlyingToken.transfer(USER, 1000);
-        wrapper.allowUser(USER);
-
-        vm.startPrank(USER);
-        underlyingToken.approve(address(wrapper), 100);
-        wrapper.deposit(100, USER);
-        vault.approve(address(wrapper), 100);
-
-        vm.startPrank(OWNER);
-        OneWayVault.OneWayVaultConfig memory config = OneWayVaultHelpers.getConfig(vault);
-        config.wrapper = address(0);
-        vault.updateConfig(abi.encode(config));
-        vm.startPrank(USER);
-
-        vm.expectRevert("Only wrapper allowed");
-        wrapper.withdraw(100, "test_receiver");
-    }
-
     function testVaultDirectDepositForbidden() public {
         underlyingToken.transfer(USER, 1000);
 
@@ -289,6 +254,20 @@ contract OneWayVaultTest is Test {
 
         vm.expectRevert("Only wrapper allowed");
         vault.withdraw(100, "test_receiver", USER);
+    }
+
+    function testWithdrawDisabled() public {
+        wrapper.setConfig(address(vault), address(zkMe), COOPERATOR, false);
+        underlyingToken.transfer(USER, 1000);
+        wrapper.allowUser(USER);
+
+        vm.startPrank(USER);
+        underlyingToken.approve(address(wrapper), 100);
+        wrapper.deposit(100, USER);
+        vault.approve(address(wrapper), 100);
+
+        vm.expectRevert(abi.encodeWithSelector(Wrapper.WithdrawsDisabled.selector));
+        wrapper.withdraw(100, "test_receiver");
     }
 
     function testDepositCapOverflow() public {

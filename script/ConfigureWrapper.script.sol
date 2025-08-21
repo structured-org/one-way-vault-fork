@@ -8,14 +8,14 @@ import {Wrapper} from "../src/Wrapper.sol";
 
 contract DeployWrapperScript is Script {
     function run() external {
-        address owner = vm.envAddress("OWNER");
+        Wrapper wrapper = Wrapper(vm.envAddress("WRAPPER"));
+        address vault = vm.envAddress("VAULT");
+        address zkMe = vm.envAddress("ZK_ME");
+        address cooperator = vm.envAddress("COOPERATOR");
+        bool withdrawsEnabled = vm.envBool("WITHDRAWS_ENABLED");
 
         vm.startBroadcast();
-        Wrapper wrapper = new Wrapper(owner);
+        wrapper.setConfig(vault, zkMe, cooperator, withdrawsEnabled);
         vm.stopBroadcast();
-
-        console.log("Wrapper address:", address(wrapper));
-        console.log("Configuration:");
-        console.log("  Owner:", owner);
     }
 }
