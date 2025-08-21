@@ -17,14 +17,20 @@ This contract will store source code and act behind a proxy, hence it is easy to
 Run `OWNER="" forge script script/DeployBaseAccount.script.sol --rpc-url "$ETHEREUM_RPC_URL" --private-key "$ETHEREUM_PRIVATE_KEY" --broadcast --verify -vvvv`, where:
 - `OWNER` must be set to the address, which will become a `BaseAccount` admin.
 
-## Step 4. Deploy OneWayVault
+## Step 4. Deploy Wrapper
 
-Run `OWNER="" IMPLEMENTATION="" UNDERLYING_TOKEN="" DEPOSIT_ACCOUNT="" STRATEGIST="" PLATFORM="" VAULT_TOKEN_NAME="" VAULT_TOKEN_SYMBOL="" forge script script/DeployOneWayVault.script.sol --rpc-url "$ETHEREUM_RPC_URL" --private-key "$ETHEREUM_PRIVATE_KEY" --broadcast --verify -vvvv`, where:
+Run `OWNER="" forge script script/DeployWrapper.script.sol --rpc-url "$ETHEREUM_RPC_URL" --private-key "$ETHEREUM_PRIVATE_KEY" --broadcast --verify -vvvv`, where:
+- `OWNER` must be set to the address, which will become a `Wrapper` admin.
+
+## Step 5. Deploy OneWayVault
+
+Run `OWNER="" IMPLEMENTATION="" UNDERLYING_TOKEN="" DEPOSIT_ACCOUNT="" STRATEGIST="" WRAPPER="" PLATFORM="" VAULT_TOKEN_NAME="" VAULT_TOKEN_SYMBOL="" forge script script/DeployOneWayVault.script.sol --rpc-url "$ETHEREUM_RPC_URL" --private-key "$ETHEREUM_PRIVATE_KEY" --broadcast --verify -vvvv`, where:
 - `OWNER` must be set to account address, which will become a `OneWayVault` admin;
-- `IMPLEMENTATION` must be set to the contract address, obtained at step 2;
+- `IMPLEMENTATION` must be set to the contract address, obtained in step 2;
 - `UNDERLYING_TOKEN` is token contract address used by the vault;
 - `DEPOSIT_ACCOUNT` must be set to `BaseAccount` address deployed in step 3;
 - `STRATEGIST` is an account address of the strategist;
+- `WRAPPER` must be set to `Wrapper` address, obtained in step 4;
 - `PLATFORM` is an account address of the platform fees recipient;
 - `VAULT_TOKEN_NAME` is an ERC20 token name for the vault token;
 - `VAULT_TOKEN_SYMBOL` is an ERC20 token symbol for the vault token.
@@ -40,20 +46,14 @@ Optionally, you might specify the following environment variables, too:
 - `DEPOSIT_CAP` is a limit of assets to be deposited (default: 0 or unlimited);
 - `STARTING_RATE` is a starting exchange rate (default is calculated on underlying token's decimals and is equal 1.0).
 
-## Step 5. Deploy Wrapper
+## Step 6. Configure Wrapper
 
-Run `OWNER="" VAULT="" ZK_ME="" COOPERATOR="" WITHDRAWS_ENABLED="" forge script script/DeployWrapper.script.sol --rpc-url "$ETHEREUM_RPC_URL" --private-key "$ETHEREUM_PRIVATE_KEY" --broadcast --verify -vvvv`, where:
-- `OWNER` must be set to account address, which will become a `Wrapper` admin;
-- `VAULT` must be set to proxy `OneWayVault` address deployed in step 4;
+Run `WRAPPER="" VAULT="" ZK_ME="" COOPERATOR="" WITHDRAWS_ENABLED="" forge script script/ConfigureWrapper.script.sol --rpc-url "$ETHEREUM_RPC_URL" --private-key "$ETHEREUM_PRIVATE_KEY" --broadcast --verify -vvvv`, where:
+- `WRAPPER` must be set to contract address, obtained in step 4;
+- `VAULT` must be set to `OneWayVault` address deployed in step 5;
 - `ZK_ME` is an address of ZkMe contract;
 - `COOPERATOR` is a cooperator address provided by ZkMe;
 - `WITHDRAWS_ENABLED` is a boolean flag which controls whether withdraws will be allowed or not. Set either to `true` or `false`.
-
-## Step 7. Register Wrapper in OneWayVault config
-
-Run `VAULT="" WRAPPER="" forge script script/UpdateOneWayVaultWrapper.script.sol --rpc-url "$ETHEREUM_RPC_URL" --private-key "$ETHEREUM_PRIVATE_KEY" --broadcast -vvvv`, where:
-- `VAULT` must be set to proxy `OneWayVault` address deployed in step 4;
-- `WRAPPER` must be set to contract `Wrapper` address deployed in step 5.
 
 ## Ownership transfer instructions
 

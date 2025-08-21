@@ -21,19 +21,7 @@ contract Wrapper is Ownable {
 
     error WithdrawsDisabled();
 
-    constructor(
-        address _owner,
-        address _vault,
-        address _zkMe,
-        address _cooperator,
-        bool _withdrawsEnabled
-    ) Ownable(_owner) {
-        vault = OneWayVault(_vault);
-        zkMe = IZkMe(_zkMe);
-        cooperator = _cooperator;
-        asset = IERC20(vault.asset());
-        withdrawsEnabled = _withdrawsEnabled;
-    }
+    constructor(address _owner) Ownable(_owner) {}
 
     modifier onlyKyc() {
         // first, check if user is explicitly approved
@@ -45,6 +33,19 @@ contract Wrapper is Ownable {
         _;
     }
 
+    function setConfig(
+        address _vault,
+        address _zkMe,
+        address _cooperator,
+        bool _withdrawsEnabled
+    ) external onlyOwner {
+        vault = OneWayVault(_vault);
+        zkMe = IZkMe(_zkMe);
+        cooperator = _cooperator;
+        asset = IERC20(vault.asset());
+        withdrawsEnabled = _withdrawsEnabled;
+    }
+
     function allowUser(address _user) external onlyOwner {
         allowedUsers[_user] = true;
     }
@@ -53,11 +54,7 @@ contract Wrapper is Ownable {
         delete allowedUsers[_user];
     }
 
-    function setWithdraws(bool _withdrawsEnabled) external onlyOwner {
-        withdrawsEnabled = _withdrawsEnabled;
-    }
-
-    function deposit(uint256 assets, address receiver) public onlyKyc returns (uint256) {
+    function deposit(uint256 assets, address receiver) external onlyKyc returns (uint256) {
         SafeERC20.safeTransferFrom(asset, msg.sender, address(this), assets);
         asset.approve(address(vault), assets);
         return vault.deposit(assets, receiver);

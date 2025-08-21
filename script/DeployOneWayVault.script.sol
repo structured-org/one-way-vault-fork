@@ -16,6 +16,7 @@ contract DeployOneWayVaultScript is Script {
         address underlyingToken = vm.envAddress("UNDERLYING_TOKEN");
         address depositAccount = vm.envAddress("DEPOSIT_ACCOUNT");
         address strategist = vm.envAddress("STRATEGIST");
+        address wrapper = vm.envAddress("WRAPPER");
         address platform = vm.envAddress("PLATFORM");
         uint256 strategistRatioBps = vm.envOr("STRATEGIST_RATIO_BPS", uint256(0));
         uint256 depositFeeBps = vm.envOr("DEPOSIT_FEE_BPS", uint256(0));
@@ -40,7 +41,7 @@ contract DeployOneWayVaultScript is Script {
         OneWayVault.OneWayVaultConfig memory config = OneWayVault.OneWayVaultConfig({
             depositAccount: BaseAccount(payable(address(depositAccount))),
             strategist: strategist,
-            wrapper: address(0),
+            wrapper: wrapper,
             depositFeeBps: uint32(depositFeeBps),
             withdrawFeeBps: uint32(withdrawFeeBps),
             maxRateIncrementBps: uint32(maxRateIncrementBps),
@@ -70,7 +71,7 @@ contract DeployOneWayVaultScript is Script {
         console.log("  Owner:                 ", owner);
         console.log("  Deposit account:       ", depositAccount);
         console.log("  Strategist:            ", strategist);
-        console.log("  Wrapper:               ", address(0));
+        console.log("  Wrapper:               ", wrapper);
         console.log("  Deposit fee BPS:       ", depositFeeBps);
         console.log("  Withdraw fee BPS:      ", withdrawFeeBps);
         console.log("  Max rate increment BPS:", maxRateIncrementBps);
