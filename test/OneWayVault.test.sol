@@ -80,8 +80,9 @@ contract OneWayVaultTest is Test {
 
         vm.startPrank(USER);
         underlyingToken.approve(address(wrapper), 100);
-        wrapper.deposit(100, USER);
+        uint256 assets = wrapper.deposit(100, USER);
 
+        assertEq(assets, 100);
         assertEq(vault.balanceOf(USER), 100);
         assertEq(underlyingToken.balanceOf(USER), 900);
         assertEq(underlyingToken.balanceOf(address(depositAccount)), 100);
@@ -93,8 +94,9 @@ contract OneWayVaultTest is Test {
 
         vm.startPrank(USER);
         underlyingToken.approve(address(wrapper), 100);
-        wrapper.deposit(100, USER);
+        uint256 assets = wrapper.deposit(100, USER);
 
+        assertEq(assets, 100);
         assertEq(vault.balanceOf(USER), 100);
         assertEq(underlyingToken.balanceOf(USER), 900);
         assertEq(underlyingToken.balanceOf(address(depositAccount)), 100);
@@ -107,10 +109,12 @@ contract OneWayVaultTest is Test {
 
         vm.startPrank(USER);
         underlyingToken.approve(address(wrapper), 100);
-        wrapper.deposit(100, USER);
+        uint256 assets = wrapper.deposit(100, USER);
 
+        assertEq(assets, 100);
         assertEq(vault.balanceOf(USER), 100);
         assertEq(underlyingToken.balanceOf(USER), 900);
+        assertEq(underlyingToken.balanceOf(address(depositAccount)), 100);
     }
 
     function testDepositFailureNoFunds() public {
