@@ -3,13 +3,13 @@
 pragma solidity ^0.8.28;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {OneWayVault} from './OneWayVault.sol';
+import {KYCOneWayVault} from './KYCOneWayVault.sol';
 import {IZkMe} from './IZkMe.sol';
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract Wrapper is Ownable {
-    OneWayVault public vault;
+    KYCOneWayVault public vault;
     IZkMe public zkMe;
     address public cooperator;
     IERC20 public asset;
@@ -39,7 +39,7 @@ contract Wrapper is Ownable {
         address _cooperator,
         bool _withdrawsEnabled
     ) external onlyOwner {
-        vault = OneWayVault(_vault);
+        vault = KYCOneWayVault(_vault);
         zkMe = IZkMe(_zkMe);
         cooperator = _cooperator;
         asset = IERC20(vault.asset());

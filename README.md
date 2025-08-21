@@ -10,7 +10,7 @@ After that, run `forge soldeer install` to obtain dependencies. And finally, run
 
 ## Step 2. Deploy implementation contract
 
-This contract will store source code and act behind a proxy, hence it is easy to deploy it. Simply run `forge script script/DeployOneWayVaultImplementation.script.sol --rpc-url "$ETHEREUM_RPC_URL" --private-key "$ETHEREUM_PRIVATE_KEY" --broadcast --verify -vvvv` and write down the final contract address, you will need it in the next steps.
+This contract will store source code and act behind a proxy, hence it is easy to deploy it. Simply run `forge script script/DeployKYCOneWayVaultImplementation.script.sol --rpc-url "$ETHEREUM_RPC_URL" --private-key "$ETHEREUM_PRIVATE_KEY" --broadcast --verify -vvvv` and write down the final contract address, you will need it in the next steps.
 
 ## Step 3. Deploy BaseAccount
 
@@ -22,10 +22,10 @@ Run `OWNER="" forge script script/DeployBaseAccount.script.sol --rpc-url "$ETHER
 Run `OWNER="" forge script script/DeployWrapper.script.sol --rpc-url "$ETHEREUM_RPC_URL" --private-key "$ETHEREUM_PRIVATE_KEY" --broadcast --verify -vvvv`, where:
 - `OWNER` must be set to the address, which will become a `Wrapper` admin.
 
-## Step 5. Deploy OneWayVault
+## Step 5. Deploy KYCOneWayVault
 
-Run `OWNER="" IMPLEMENTATION="" UNDERLYING_TOKEN="" DEPOSIT_ACCOUNT="" STRATEGIST="" WRAPPER="" PLATFORM="" VAULT_TOKEN_NAME="" VAULT_TOKEN_SYMBOL="" forge script script/DeployOneWayVault.script.sol --rpc-url "$ETHEREUM_RPC_URL" --private-key "$ETHEREUM_PRIVATE_KEY" --broadcast --verify -vvvv`, where:
-- `OWNER` must be set to account address, which will become a `OneWayVault` admin;
+Run `OWNER="" IMPLEMENTATION="" UNDERLYING_TOKEN="" DEPOSIT_ACCOUNT="" STRATEGIST="" WRAPPER="" PLATFORM="" VAULT_TOKEN_NAME="" VAULT_TOKEN_SYMBOL="" forge script script/DeployKYCOneWayVault.script.sol --rpc-url "$ETHEREUM_RPC_URL" --private-key "$ETHEREUM_PRIVATE_KEY" --broadcast --verify -vvvv`, where:
+- `OWNER` must be set to account address, which will become a `KYCOneWayVault` admin;
 - `IMPLEMENTATION` must be set to the contract address, obtained in step 2;
 - `UNDERLYING_TOKEN` is token contract address used by the vault;
 - `DEPOSIT_ACCOUNT` must be set to `BaseAccount` address deployed in step 3;
@@ -50,7 +50,7 @@ Optionally, you might specify the following environment variables, too:
 
 Run `WRAPPER="" VAULT="" ZK_ME="" COOPERATOR="" WITHDRAWS_ENABLED="" forge script script/ConfigureWrapper.script.sol --rpc-url "$ETHEREUM_RPC_URL" --private-key "$ETHEREUM_PRIVATE_KEY" --broadcast --verify -vvvv`, where:
 - `WRAPPER` must be set to contract address, obtained in step 4;
-- `VAULT` must be set to `OneWayVault` address deployed in step 5;
+- `VAULT` must be set to `KYCOneWayVault` address deployed in step 5;
 - `ZK_ME` is an address of ZkMe contract;
 - `COOPERATOR` is a cooperator address provided by ZkMe;
 - `WITHDRAWS_ENABLED` is a boolean flag which controls whether withdraws will be allowed or not. Set either to `true` or `false`.
