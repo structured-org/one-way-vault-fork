@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.28;
 
-import {OneWayVault} from "../src/OneWayVault.sol";
+import {KYCOneWayVault} from "../src/KYCOneWayVault.sol";
 import {BaseAccount} from "../src/BaseAccount.sol";
 
-library OneWayVaultHelpers {
-    function getConfig(OneWayVault vault) internal view returns (OneWayVault.OneWayVaultConfig memory) {
+library KYCOneWayVaultHelpers {
+    function getConfig(KYCOneWayVault vault) internal view returns (KYCOneWayVault.KYCOneWayVaultConfig memory) {
         (BaseAccount depositAccount,
          address strategist,
          address wrapper,
@@ -17,9 +17,9 @@ library OneWayVaultHelpers {
          uint64 minRateUpdateDelay,
          uint64 maxRateUpdateDelay,
          uint256 depositCap,
-         OneWayVault.FeeDistributionConfig memory feeDistribution
+         KYCOneWayVault.FeeDistributionConfig memory feeDistribution
         ) = vault.config();
-        OneWayVault.OneWayVaultConfig memory config = OneWayVault.OneWayVaultConfig({
+        KYCOneWayVault.KYCOneWayVaultConfig memory config = KYCOneWayVault.KYCOneWayVaultConfig({
             depositAccount: depositAccount,
             strategist: strategist,
             wrapper: wrapper,

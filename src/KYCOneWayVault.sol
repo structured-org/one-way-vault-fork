@@ -12,7 +12,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
- * @title OneWayVault
+ * @title KYCOneWayVault
  * @dev A one-way vault contract that enables deposits on one chain with withdrawal requests
  * to be processed on another domain/chain. Uses ERC4626 tokenized vault standard.
  *
@@ -25,7 +25,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
  * - Deposit caps
  * - Pausability
  */
-contract OneWayVault is
+contract KYCOneWayVault is
     Initializable,
     ERC4626Upgradeable,
     OwnableUpgradeable,
@@ -81,7 +81,7 @@ contract OneWayVault is
      * @param updater Address that updated the config
      * @param newConfig The new configuration
      */
-    event ConfigUpdated(address indexed updater, OneWayVaultConfig newConfig);
+    event ConfigUpdated(address indexed updater, KYCOneWayVaultConfig newConfig);
 
     /**
      * @dev Restricts function access to only the strategist
@@ -149,7 +149,7 @@ contract OneWayVault is
      * @param depositCap Maximum assets that can be deposited (0 means no cap)
      * @param feeDistribution Configuration for fee distribution between platform and strategist
      */
-    struct OneWayVaultConfig {
+    struct KYCOneWayVaultConfig {
         BaseAccount depositAccount;
         address strategist;
         address wrapper;
@@ -207,7 +207,7 @@ contract OneWayVault is
 
     // Main state variables
 
-    OneWayVaultConfig public config;
+    KYCOneWayVaultConfig public config;
 
     uint256 public redemptionRate;
 
@@ -268,7 +268,7 @@ contract OneWayVault is
         __ReentrancyGuard_init();
         __UUPSUpgradeable_init();
 
-        config = abi.decode(_config, (OneWayVaultConfig));
+        config = abi.decode(_config, (KYCOneWayVaultConfig));
         _validateConfig(config);
 
         ONE_SHARE = 10 ** decimals();
@@ -289,10 +289,10 @@ contract OneWayVault is
     /**
      * @notice Updates the vault configuration
      * @dev Validates all configuration parameters before updating
-     * @param _config Encoded OneWayVaultConfig struct
+     * @param _config Encoded KYCOneWayVaultConfig struct
      */
     function updateConfig(bytes memory _config) external onlyOwner {
-        OneWayVaultConfig memory decodedConfig = abi.decode(_config, (OneWayVaultConfig));
+        KYCOneWayVaultConfig memory decodedConfig = abi.decode(_config, (KYCOneWayVaultConfig));
 
         _validateConfig(decodedConfig);
 
@@ -304,9 +304,9 @@ contract OneWayVault is
 
     /**
      * @dev Validates the configuration parameters
-     * @param decodedConfig The decoded OneWayVaultConfig struct
+     * @param decodedConfig The decoded KYCOneWayVaultConfig struct
      */
-    function _validateConfig(OneWayVaultConfig memory decodedConfig) internal pure {
+    function _validateConfig(KYCOneWayVaultConfig memory decodedConfig) internal pure {
         if (address(decodedConfig.depositAccount) == address(0)) {
             revert("Deposit account cannot be zero address");
         }
@@ -463,7 +463,7 @@ contract OneWayVault is
             revert("Redemption rate cannot be zero");
         }
 
-        OneWayVaultConfig memory _config = config;
+        KYCOneWayVaultConfig memory _config = config;
 
         // Check that enough time has passed since last update
         if (uint64(block.timestamp) - lastRateUpdateTimestamp < _config.minRateUpdateDelay) {

@@ -5,3 +5,4 @@ Modifications by Structured:
 - stripped unused dependencies
 - added deployment scripts and docs
 - added new configuration parameter: wrapper
+- added new contract: wrapper, which performs KYC and forwards calls to the vault

@@ -4,14 +4,14 @@ pragma solidity ^0.8.28;
 
 import {Script} from "forge-std/src/Script.sol";
 import {console} from "forge-std/src/console.sol";
-import {OneWayVault} from "../src/OneWayVault.sol";
+import {KYCOneWayVault} from "../src/KYCOneWayVault.sol";
 
-contract DeployOneWayVaultImplementationScript is Script {
+contract DeployKYCOneWayVaultImplementationScript is Script {
     function run() external {
         vm.startBroadcast();
-        OneWayVault vault = new OneWayVault();
+        KYCOneWayVault vault = new KYCOneWayVault();
         vm.stopBroadcast();
 
-        console.log("OneWayVault address:", address(vault));
+        console.log("KYCOneWayVault address:", address(vault));
     }
 }

@@ -4,12 +4,12 @@ pragma solidity ^0.8.28;
 
 import {Script} from "forge-std/src/Script.sol";
 import {console} from "forge-std/src/console.sol";
-import {OneWayVault} from "../src/OneWayVault.sol";
+import {KYCOneWayVault} from "../src/KYCOneWayVault.sol";
 import {BaseAccount} from "../src/BaseAccount.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-contract DeployOneWayVaultScript is Script {
+contract DeployKYCOneWayVaultScript is Script {
     function run() external {
         address owner = vm.envAddress("OWNER");
         address implementation = vm.envAddress("IMPLEMENTATION");
@@ -32,13 +32,13 @@ contract DeployOneWayVaultScript is Script {
         uint256 defaultStartingRate = 10 ** ERC20(underlyingToken).decimals();
         uint256 startingRate = vm.envOr("STARTING_RATE", defaultStartingRate);
 
-        OneWayVault.FeeDistributionConfig memory feeConfig = OneWayVault.FeeDistributionConfig({
+        KYCOneWayVault.FeeDistributionConfig memory feeConfig = KYCOneWayVault.FeeDistributionConfig({
             strategistAccount: strategist, // TODO: probably should be a separate account?
             platformAccount: platform,
             strategistRatioBps: uint32(strategistRatioBps)
         });
 
-        OneWayVault.OneWayVaultConfig memory config = OneWayVault.OneWayVaultConfig({
+        KYCOneWayVault.KYCOneWayVaultConfig memory config = KYCOneWayVault.KYCOneWayVaultConfig({
             depositAccount: BaseAccount(payable(address(depositAccount))),
             strategist: strategist,
             wrapper: wrapper,
@@ -52,7 +52,7 @@ contract DeployOneWayVaultScript is Script {
             feeDistribution: feeConfig
         });
 
-        bytes memory initializeCall = abi.encodeCall(OneWayVault.initialize, (
+        bytes memory initializeCall = abi.encodeCall(KYCOneWayVault.initialize, (
             owner,
             abi.encode(config),
             underlyingToken,
@@ -65,7 +65,7 @@ contract DeployOneWayVaultScript is Script {
         ERC1967Proxy proxy = new ERC1967Proxy(implementation, initializeCall);
         vm.stopBroadcast();
 
-        console.log("OneWayVault address:", address(proxy));
+        console.log("KYCOneWayVault address:", address(proxy));
         console.log("Configuration:");
         console.log("  Implementation:        ", implementation);
         console.log("  Owner:                 ", owner);

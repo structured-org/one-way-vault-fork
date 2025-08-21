@@ -3,7 +3,7 @@
 pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/src/Test.sol";
-import {OneWayVault} from "../src/OneWayVault.sol";
+import {KYCOneWayVault} from "../src/KYCOneWayVault.sol";
 import {BaseAccount} from "../src/BaseAccount.sol";
 import {ERC20Mock} from "../src/mock/ERC20Mock.sol";
 import {ZkMeMock} from "../src/mock/ZkMeMock.sol";
@@ -11,9 +11,9 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 import {Wrapper} from "../src/Wrapper.sol";
 import {IERC20Errors} from "@openzeppelin-contracts-5.2.0/interfaces/draft-IERC6093.sol";
 import {ERC4626Upgradeable} from "@openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
-import {OneWayVaultHelpers} from "../lib/OneWayVault.lib.sol";
+import {KYCOneWayVaultHelpers} from "../lib/KYCOneWayVault.lib.sol";
 
-contract OneWayVaultTest is Test {
+contract KYCOneWayVaultTest is Test {
     address constant OWNER = address(1);
     address constant STRATEGIST = address(2);
     address constant PLATFORM = address(3);
@@ -23,7 +23,7 @@ contract OneWayVaultTest is Test {
     ERC20Mock underlyingToken;
     BaseAccount depositAccount;
     ZkMeMock zkMe;
-    OneWayVault vault;
+    KYCOneWayVault vault;
     Wrapper wrapper;
 
     function setUp() public {
@@ -32,7 +32,7 @@ contract OneWayVaultTest is Test {
         zkMe = new ZkMeMock();
 
         // README step 2
-        OneWayVault implementation = new OneWayVault();
+        KYCOneWayVault implementation = new KYCOneWayVault();
 
         // README step 3
         depositAccount = new BaseAccount(OWNER, new address[](0));
@@ -41,12 +41,12 @@ contract OneWayVaultTest is Test {
         wrapper = new Wrapper(OWNER);
 
         // README step 5
-        OneWayVault.FeeDistributionConfig memory feeConfig = OneWayVault.FeeDistributionConfig({
+        KYCOneWayVault.FeeDistributionConfig memory feeConfig = KYCOneWayVault.FeeDistributionConfig({
             strategistAccount: STRATEGIST,
             platformAccount: PLATFORM,
             strategistRatioBps: uint32(0)
         });
-        OneWayVault.OneWayVaultConfig memory config = OneWayVault.OneWayVaultConfig({
+        KYCOneWayVault.KYCOneWayVaultConfig memory config = KYCOneWayVault.KYCOneWayVaultConfig({
             depositAccount: BaseAccount(payable(address(depositAccount))),
             strategist: STRATEGIST,
             wrapper: address(wrapper),
@@ -59,7 +59,7 @@ contract OneWayVaultTest is Test {
             depositCap: uint256(0),
             feeDistribution: feeConfig
         });
-        bytes memory initializeCall = abi.encodeCall(OneWayVault.initialize, (
+        bytes memory initializeCall = abi.encodeCall(KYCOneWayVault.initialize, (
             OWNER,
             abi.encode(config),
             address(underlyingToken),
@@ -68,7 +68,7 @@ contract OneWayVaultTest is Test {
             10 ** underlyingToken.decimals()
         ));
         ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initializeCall);
-        vault = OneWayVault(address(proxy));
+        vault = KYCOneWayVault(address(proxy));
 
         // README step 6
         wrapper.setConfig(address(vault), address(zkMe), COOPERATOR, true);
@@ -275,7 +275,7 @@ contract OneWayVaultTest is Test {
     }
 
     function testDepositCapOverflow() public {
-        OneWayVault.OneWayVaultConfig memory config = OneWayVaultHelpers.getConfig(vault);
+        KYCOneWayVault.KYCOneWayVaultConfig memory config = KYCOneWayVaultHelpers.getConfig(vault);
         config.depositCap = 200;
         vault.updateConfig(abi.encode(config));
 
