@@ -10,6 +10,7 @@ import {Initializable} from "@openzeppelin-contracts-upgradeable/proxy/utils/Ini
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {StorageSlot} from "@openzeppelin/contracts/utils/StorageSlot.sol";
 
 /**
  * @title KYCOneWayVault
@@ -33,6 +34,12 @@ contract KYCOneWayVault is
     UUPSUpgradeable
 {
     using Math for uint256;
+
+    /**
+     * @notice Address of wrapper, the only account allowed to execute deposit() and withdraw()
+     * @dev bytes32(uint256(keccak256('kyc_one_way_vault.wrapper')) - 1)
+     */
+    bytes32 internal constant _WRAPPER_SLOT = 0x4716d747150b04699545244f6e6fb3e16948c6fec05693434a01f1b98f81bd93;
 
     /**
      * @dev Emitted when the vault's paused state changes
@@ -107,7 +114,7 @@ contract KYCOneWayVault is
      * @dev Restricts function access to only wrapper
      */
     modifier onlyWrapper() {
-        if (msg.sender != config.wrapper) {
+        if (msg.sender != StorageSlot.getAddressSlot(_WRAPPER_SLOT).value) {
             revert("Only wrapper allowed");
         }
         _;
@@ -137,7 +144,6 @@ contract KYCOneWayVault is
      * @dev Configuration structure for the vault
      * @param depositAccount Account where deposits are held
      * @param strategist Address of the vault strategist
-     * @param wrapper Address of wrapper, the only account allowed to execute deposit() and withdraw()
      * @param depositFeeBps Fee charged on deposits in basis points (1 BPS = 0.01%)
      * @param withdrawFeeBps Fee charged on withdrawals in basis points (1 BPS = 0.01%)
      * @param maxRateIncrementBps Maximum allowed relative increase in redemption rate per update (in basis points).
@@ -152,7 +158,6 @@ contract KYCOneWayVault is
     struct KYCOneWayVaultConfig {
         BaseAccount depositAccount;
         address strategist;
-        address wrapper;
         uint32 depositFeeBps;
         uint32 withdrawFeeBps;
         uint32 maxRateIncrementBps;
@@ -253,6 +258,7 @@ contract KYCOneWayVault is
      * @param vaultTokenName Name of the vault token
      * @param vaultTokenSymbol Symbol of the vault token
      * @param startingRate Initial redemption rate
+     * @param wrapper Address of the wrapper
      */
     function initialize(
         address _owner,
@@ -260,7 +266,8 @@ contract KYCOneWayVault is
         address underlying,
         string memory vaultTokenName,
         string memory vaultTokenSymbol,
-        uint256 startingRate
+        uint256 startingRate,
+        address wrapper
     ) external initializer {
         __ERC20_init(vaultTokenName, vaultTokenSymbol);
         __ERC4626_init(IERC20(underlying));
@@ -275,6 +282,8 @@ contract KYCOneWayVault is
         require(startingRate > 0, "Starting redemption rate cannot be zero");
         redemptionRate = startingRate; // Initialize at specified starting rate
         lastRateUpdateTimestamp = uint64(block.timestamp); // Set initial timestamp for rate updates
+
+        StorageSlot.getAddressSlot(_WRAPPER_SLOT).value = wrapper;
     }
 
     /**
@@ -300,6 +309,14 @@ contract KYCOneWayVault is
         config = decodedConfig;
 
         emit ConfigUpdated(msg.sender, decodedConfig);
+    }
+
+    /**
+     * @dev Updates the wrapper
+     * @param _newWrapper New wrapper address
+     */
+    function updateWrapper(address _newWrapper) external onlyOwner {
+        StorageSlot.getAddressSlot(_WRAPPER_SLOT).value = _newWrapper;
     }
 
     /**

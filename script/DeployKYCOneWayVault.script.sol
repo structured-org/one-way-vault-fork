@@ -41,7 +41,6 @@ contract DeployKYCOneWayVaultScript is Script {
         KYCOneWayVault.KYCOneWayVaultConfig memory config = KYCOneWayVault.KYCOneWayVaultConfig({
             depositAccount: BaseAccount(payable(address(depositAccount))),
             strategist: strategist,
-            wrapper: wrapper,
             depositFeeBps: uint32(depositFeeBps),
             withdrawFeeBps: uint32(withdrawFeeBps),
             maxRateIncrementBps: uint32(maxRateIncrementBps),
@@ -58,7 +57,8 @@ contract DeployKYCOneWayVaultScript is Script {
             underlyingToken,
             vaultTokenName,
             vaultTokenSymbol,
-            startingRate
+            startingRate,
+            wrapper
         ));
 
         vm.startBroadcast();

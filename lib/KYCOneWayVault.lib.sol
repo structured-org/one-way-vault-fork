@@ -4,12 +4,15 @@ pragma solidity ^0.8.28;
 
 import {KYCOneWayVault} from "../src/KYCOneWayVault.sol";
 import {BaseAccount} from "../src/BaseAccount.sol";
+import {ERC20Mock} from "../src/mock/ERC20Mock.sol";
+import {ZkMeMock} from "../src/mock/ZkMeMock.sol";
+import {Wrapper} from "../src/Wrapper.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 library KYCOneWayVaultHelpers {
     function getConfig(KYCOneWayVault vault) internal view returns (KYCOneWayVault.KYCOneWayVaultConfig memory) {
         (BaseAccount depositAccount,
          address strategist,
-         address wrapper,
          uint32 depositFeeBps,
          uint32 withdrawFeeBps,
          uint32 maxRateIncrementBps,
@@ -22,7 +25,6 @@ library KYCOneWayVaultHelpers {
         KYCOneWayVault.KYCOneWayVaultConfig memory config = KYCOneWayVault.KYCOneWayVaultConfig({
             depositAccount: depositAccount,
             strategist: strategist,
-            wrapper: wrapper,
             depositFeeBps: depositFeeBps,
             withdrawFeeBps: withdrawFeeBps,
             maxRateIncrementBps: maxRateIncrementBps,
@@ -33,5 +35,63 @@ library KYCOneWayVaultHelpers {
             feeDistribution: feeDistribution
         });
         return config;
+    }
+
+    function deployTestEnvironment(
+        address owner,
+        address strategist,
+        address platform,
+        address cooperator
+    ) internal returns (
+        ERC20Mock underlyingToken,
+        BaseAccount depositAccount,
+        ZkMeMock zkMe,
+        KYCOneWayVault vault,
+        Wrapper wrapper
+    ) {
+        underlyingToken = new ERC20Mock();
+        zkMe = new ZkMeMock();
+
+        // README step 2
+        KYCOneWayVault implementation = new KYCOneWayVault();
+
+        // README step 3
+        depositAccount = new BaseAccount(owner, new address[](0));
+
+        // README step 4
+        wrapper = new Wrapper(owner);
+
+        // README step 5
+        KYCOneWayVault.FeeDistributionConfig memory feeConfig = KYCOneWayVault.FeeDistributionConfig({
+            strategistAccount: strategist,
+            platformAccount: platform,
+            strategistRatioBps: uint32(0)
+        });
+        KYCOneWayVault.KYCOneWayVaultConfig memory config = KYCOneWayVault.KYCOneWayVaultConfig({
+            depositAccount: BaseAccount(payable(address(depositAccount))),
+            strategist: strategist,
+            depositFeeBps: uint32(0),
+            withdrawFeeBps: uint32(0),
+            maxRateIncrementBps: uint32(0),
+            maxRateDecrementBps: uint32(0),
+            minRateUpdateDelay: uint64(0),
+            maxRateUpdateDelay: uint64(1),
+            depositCap: uint256(0),
+            feeDistribution: feeConfig
+        });
+        bytes memory initializeCall = abi.encodeCall(KYCOneWayVault.initialize, (
+            owner,
+            abi.encode(config),
+            address(underlyingToken),
+            "vTEST",
+            "vSYMBOL",
+            10 ** underlyingToken.decimals(),
+            address(wrapper)
+        ));
+        ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initializeCall);
+        vault = KYCOneWayVault(address(proxy));
+
+        // README step 6
+        wrapper.setConfig(address(vault), address(zkMe), cooperator, true);
     }
 }
