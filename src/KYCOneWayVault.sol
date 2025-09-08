@@ -622,7 +622,7 @@ contract KYCOneWayVault is
      * @param receiver Address to receive the withdrawn assets on the destination domain (as string)
      * @param owner Address that owns the shares
      */
-    function withdraw(uint256 assets, string calldata receiver, address owner) external onlyWrapper nonReentrant whenNotPaused {
+    function withdraw(uint256 assets, string calldata receiver, address owner) external nonReentrant whenNotPaused {
         if (_checkAndHandleStaleRate()) {
             return; // Exit early if vault was just paused
         }
