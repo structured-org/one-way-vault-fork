@@ -37,6 +37,19 @@ library KYCOneWayVaultHelpers {
         return config;
     }
 
+    function getState(KYCOneWayVault vault) internal view returns (KYCOneWayVault.VaultState memory) {
+        (bool paused,
+         bool pausedByOwner,
+         bool pausedByStaleRate
+        ) = vault.vaultState();
+        KYCOneWayVault.VaultState memory state = KYCOneWayVault.VaultState({
+            paused: paused,
+            pausedByOwner: pausedByOwner,
+            pausedByStaleRate: pausedByStaleRate
+        });
+        return state;
+    }
+
     function deployTestEnvironment(
         address owner,
         address strategist,
@@ -53,15 +66,20 @@ library KYCOneWayVaultHelpers {
         zkMe = new ZkMeMock();
 
         // README step 2
-        KYCOneWayVault implementation = new KYCOneWayVault();
+        KYCOneWayVault vaultImplementation = new KYCOneWayVault();
 
         // README step 3
-        depositAccount = new BaseAccount(owner, new address[](0));
+        Wrapper wrapperImplementation = new Wrapper();
 
         // README step 4
-        wrapper = new Wrapper(owner);
+        depositAccount = new BaseAccount(owner, new address[](0));
 
         // README step 5
+        bytes memory wrapperInitializeCall = abi.encodeCall(Wrapper.initialize, (owner));
+        ERC1967Proxy wrapperProxy = new ERC1967Proxy(address(wrapperImplementation), wrapperInitializeCall);
+        wrapper = Wrapper(address(wrapperProxy));
+
+        // README step 6
         KYCOneWayVault.FeeDistributionConfig memory feeConfig = KYCOneWayVault.FeeDistributionConfig({
             strategistAccount: strategist,
             platformAccount: platform,
@@ -79,7 +97,7 @@ library KYCOneWayVaultHelpers {
             depositCap: uint256(0),
             feeDistribution: feeConfig
         });
-        bytes memory initializeCall = abi.encodeCall(KYCOneWayVault.initialize, (
+        bytes memory vaultInitializeCall = abi.encodeCall(KYCOneWayVault.initialize, (
             owner,
             abi.encode(config),
             address(underlyingToken),
@@ -88,10 +106,10 @@ library KYCOneWayVaultHelpers {
             10 ** underlyingToken.decimals(),
             address(wrapper)
         ));
-        ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initializeCall);
-        vault = KYCOneWayVault(address(proxy));
+        ERC1967Proxy vaultProxy = new ERC1967Proxy(address(vaultImplementation), vaultInitializeCall);
+        vault = KYCOneWayVault(address(vaultProxy));
 
-        // README step 6
-        wrapper.setConfig(address(vault), address(zkMe), cooperator, true);
+        // README step 7
+        wrapper.setConfig(address(vault), address(zkMe), cooperator);
     }
 }

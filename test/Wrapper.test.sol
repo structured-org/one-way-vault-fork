@@ -9,7 +9,6 @@ import {ERC20Mock} from "../src/mock/ERC20Mock.sol";
 import {ZkMeMock} from "../src/mock/ZkMeMock.sol";
 import {Wrapper} from "../src/Wrapper.sol";
 import {IERC20Errors} from "@openzeppelin-contracts-5.2.0/interfaces/draft-IERC6093.sol";
-import {ERC4626Upgradeable} from "@openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {KYCOneWayVaultHelpers} from "../lib/KYCOneWayVault.lib.sol";
 
 contract WrapperTest is Test {
@@ -126,108 +125,31 @@ contract WrapperTest is Test {
         wrapper.deposit(100, USER);
     }
 
-    function testWithdrawSuccess() public {
+    function testDepositRefund() public {
         underlyingToken.transfer(USER, 1000);
         wrapper.allowUser(USER);
 
+        skip(10); // forwards time beyond maxRateUpdateDelay
         vm.startPrank(USER);
         underlyingToken.approve(address(wrapper), 100);
-        wrapper.deposit(100, USER);
-        vault.approve(address(wrapper), 100);
-        wrapper.withdraw(100, "test_receiver");
+        uint256 assets = wrapper.deposit(100, USER);
 
-        (uint64 id,
-         address owner,
-         uint256 redemptionRate,
-         uint256 sharesAmount,
-         string memory receiver
-        ) = vault.withdrawRequests(0);
-        assertEq(id, 0);
-        assertEq(owner, USER);
-        assertEq(redemptionRate, 10 ** 18);
-        assertEq(sharesAmount, 100);
-        assertEq(receiver, "test_receiver");
+        assertEq(assets, 0);
+        assertEq(vault.balanceOf(USER), 0);
+        assertEq(underlyingToken.balanceOf(USER), 1000);
+        assertEq(underlyingToken.balanceOf(address(depositAccount)), 0);
+
+        KYCOneWayVault.VaultState memory state = KYCOneWayVaultHelpers.getState(vault);
+        assertEq(state.paused, true);
+        assertEq(state.pausedByOwner, false);
+        assertEq(state.pausedByStaleRate, true);
     }
 
-    function testWithdrawFailureNoFunds() public {
+    function testManualUserApproval() public {
+        assertEq(wrapper.userAllowed(USER), false);
         wrapper.allowUser(USER);
-
-        vm.startPrank(USER);
-        vault.approve(address(wrapper), 100);
-
-        vm.expectRevert(abi.encodeWithSelector(ERC4626Upgradeable.ERC4626ExceededMaxWithdraw.selector, USER, 100, 0));
-        wrapper.withdraw(100, "test_receiver");
-    }
-
-    function testWithdrawFailureNotEnoughFunds() public {
-        underlyingToken.transfer(USER, 1000);
-        wrapper.allowUser(USER);
-
-        vm.startPrank(USER);
-        underlyingToken.approve(address(wrapper), 20);
-        wrapper.deposit(20, USER);
-        vault.approve(address(wrapper), 100);
-
-        vm.expectRevert(abi.encodeWithSelector(ERC4626Upgradeable.ERC4626ExceededMaxWithdraw.selector, USER, 100, 20));
-        wrapper.withdraw(100, "test_receiver");
-    }
-
-    function testWithdrawFailureNoALlowance() public {
-        underlyingToken.transfer(USER, 1000);
-        wrapper.allowUser(USER);
-
-        vm.startPrank(USER);
-        underlyingToken.approve(address(wrapper), 100);
-        wrapper.deposit(100, USER);
-
-        vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, address(wrapper), 0, 100));
-        wrapper.withdraw(100, "test_receiver");
-    }
-
-    function testWithdrawFailureNotEnoughAllowance() public {
-        underlyingToken.transfer(USER, 1000);
-        wrapper.allowUser(USER);
-
-        vm.startPrank(USER);
-        underlyingToken.approve(address(wrapper), 100);
-        wrapper.deposit(100, USER);
-        vault.approve(address(wrapper), 20);
-
-        vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, address(wrapper), 20, 100));
-        wrapper.withdraw(100, "test_receiver");
-    }
-
-    function testVaultDirectDepositForbidden() public {
-        underlyingToken.transfer(USER, 1000);
-
-        vm.startPrank(USER);
-        vm.expectRevert("Only wrapper allowed");
-        vault.deposit(100, USER);
-    }
-
-    function testVaultDirectWithdrawForbidden() public {
-        underlyingToken.transfer(USER, 1000);
-        wrapper.allowUser(USER);
-
-        vm.startPrank(USER);
-        underlyingToken.approve(address(wrapper), 100);
-        wrapper.deposit(100, USER);
-
-        vm.expectRevert("Only wrapper allowed");
-        vault.withdraw(100, "test_receiver", USER);
-    }
-
-    function testWithdrawDisabled() public {
-        wrapper.setConfig(address(vault), address(zkMe), COOPERATOR, false);
-        underlyingToken.transfer(USER, 1000);
-        wrapper.allowUser(USER);
-
-        vm.startPrank(USER);
-        underlyingToken.approve(address(wrapper), 100);
-        wrapper.deposit(100, USER);
-        vault.approve(address(wrapper), 100);
-
-        vm.expectRevert(abi.encodeWithSelector(Wrapper.WithdrawsDisabled.selector));
-        wrapper.withdraw(100, "test_receiver");
+        assertEq(wrapper.userAllowed(USER), true);
+        wrapper.removeUser(USER);
+        assertEq(wrapper.userAllowed(USER), false);
     }
 }

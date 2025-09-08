@@ -6,15 +6,12 @@ import {Script} from "forge-std/src/Script.sol";
 import {console} from "forge-std/src/console.sol";
 import {Wrapper} from "../src/Wrapper.sol";
 
-contract DeployWrapperScript is Script {
+contract DeployWrapperImplementationScript is Script {
     function run() external {
-        Wrapper wrapper = Wrapper(vm.envAddress("WRAPPER"));
-        address vault = vm.envAddress("VAULT");
-        address zkMe = vm.envAddress("ZK_ME");
-        address cooperator = vm.envAddress("COOPERATOR");
-
         vm.startBroadcast();
-        wrapper.setConfig(vault, zkMe, cooperator);
+        Wrapper wrapper = new Wrapper();
         vm.stopBroadcast();
+
+        console.log("Wrapper address:", address(wrapper));
     }
 }
