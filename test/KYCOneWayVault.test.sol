@@ -75,4 +75,12 @@ contract KYCOneWayVaultTest is Test {
         vm.expectRevert("Only wrapper allowed");
         vault.deposit(100, USER);
     }
+
+    function testDirectMintForbidden() public {
+        underlyingToken.transfer(USER, 1000);
+
+        vm.startPrank(USER);
+        vm.expectRevert("Only wrapper allowed");
+        vault.mint(100, USER);
+    }
 }

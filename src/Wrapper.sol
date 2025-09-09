@@ -22,7 +22,6 @@ contract Wrapper is
         IZkMe zkMe;
         address cooperator;
         IERC20 asset;
-        mapping(address => bool) allowedUsers;
     }
 
     /**
@@ -34,6 +33,35 @@ contract Wrapper is
         assembly {
             $.slot := _CONFIG_SLOT
         }
+    }
+
+    struct AllowedUsers {
+        mapping(address => bool) allowedUsers;
+    }
+
+    /**
+     * @dev bytes32(uint256(keccak256('wrapper.allowed_users')) - 1)
+     */
+    bytes32 internal constant _ALLOWED_USERS_SLOT = 0x9f9702eae2e04bd68c59413adb0e3b63f639d94e80b3b11a7f6678c38c2aeff2;
+
+    function _getAllowedUsers() private pure returns (AllowedUsers storage $) {
+        assembly {
+            $.slot := _ALLOWED_USERS_SLOT
+        }
+    }
+
+    modifier onlyKyc() {
+        // First, check if user is explicitly approved inside of the Wrapper.
+        // Only then ask ZkMe if user is approved on its side.
+        // This order of execution saves gas, avoiding a call to ZkMe when possible.
+        if (
+            !_getAllowedUsers().allowedUsers[msg.sender] &&
+            !_getConfig().zkMe.hasApproved(_getConfig().cooperator, msg.sender)
+        ) {
+            revert KycFailed();
+        }
+
+        _;
     }
 
     error KycFailed();
@@ -66,39 +94,48 @@ contract Wrapper is
     }
 
     function allowUser(address _user) external onlyOwner {
-        _getConfig().allowedUsers[_user] = true;
+        _getAllowedUsers().allowedUsers[_user] = true;
     }
 
     function removeUser(address _user) external onlyOwner {
-        delete _getConfig().allowedUsers[_user];
+        delete _getAllowedUsers().allowedUsers[_user];
     }
 
     function userAllowed(address _user) external view returns (bool) {
-        return _getConfig().allowedUsers[_user];
+        return _getAllowedUsers().allowedUsers[_user];
     }
 
-    function deposit(uint256 assets, address receiver) external nonReentrant returns (uint256) {
+    function deposit(uint256 assets, address receiver) external nonReentrant onlyKyc returns (uint256) {
         Config storage config = _getConfig();
 
-        // First, check if user is explicitly approved inside of the Wrapper.
-        // Only then ask ZkMe if user is approved on its side.
-        // This order of execution saves gas, avoiding a call to ZkMe when possible.
-        if (!config.allowedUsers[msg.sender] && !config.zkMe.hasApproved(config.cooperator, msg.sender)) {
-            revert KycFailed();
-        }
-
         SafeERC20.safeTransferFrom(config.asset, msg.sender, address(this), assets);
-
         config.asset.approve(address(config.vault), assets);
+
         uint256 shares = config.vault.deposit(assets, receiver);
         if (shares == 0) {
-            // The vault has paused itself, now we have to refund the user.
-            // We do not revert here since we want the vault to be able to
-            // update it's pause state successfully.
-            SafeERC20.safeTransfer(config.asset, msg.sender, assets);
-            return 0;
+            _refund(config.asset, assets);
         }
-
         return shares;
+    }
+
+    function mint(uint256 shares, address receiver) external nonReentrant onlyKyc returns (uint256) {
+        Config storage config = _getConfig();
+
+        (uint256 assets,) = _getConfig().vault.calculateMintFee(shares);
+        SafeERC20.safeTransferFrom(config.asset, msg.sender, address(this), assets);
+        config.asset.approve(address(config.vault), assets);
+
+        uint256 assetsDeposited = config.vault.mint(shares, receiver);
+        if (assetsDeposited == 0) {
+            _refund(config.asset, assets);
+        }
+        return assetsDeposited;
+    }
+
+    function _refund(IERC20 asset, uint256 assets) internal {
+        // The vault has paused itself, now we have to refund the user.
+        // We do not revert here since we want the vault to be able to
+        // update it's pause state successfully.
+        SafeERC20.safeTransfer(asset, msg.sender, assets);
     }
 }
