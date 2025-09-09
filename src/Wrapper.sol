@@ -36,6 +36,19 @@ contract Wrapper is
         }
     }
 
+    modifier onlyKyc() {
+        Config storage config = _getConfig();
+
+        // First, check if user is explicitly approved inside of the Wrapper.
+        // Only then ask ZkMe if user is approved on its side.
+        // This order of execution saves gas, avoiding a call to ZkMe when possible.
+        if (!config.allowedUsers[msg.sender] && !config.zkMe.hasApproved(config.cooperator, msg.sender)) {
+            revert KycFailed();
+        }
+
+        _;
+    }
+
     error KycFailed();
 
     constructor() {
@@ -77,28 +90,37 @@ contract Wrapper is
         return _getConfig().allowedUsers[_user];
     }
 
-    function deposit(uint256 assets, address receiver) external nonReentrant returns (uint256) {
+    function deposit(uint256 assets, address receiver) external nonReentrant onlyKyc returns (uint256) {
         Config storage config = _getConfig();
 
-        // First, check if user is explicitly approved inside of the Wrapper.
-        // Only then ask ZkMe if user is approved on its side.
-        // This order of execution saves gas, avoiding a call to ZkMe when possible.
-        if (!config.allowedUsers[msg.sender] && !config.zkMe.hasApproved(config.cooperator, msg.sender)) {
-            revert KycFailed();
-        }
-
         SafeERC20.safeTransferFrom(config.asset, msg.sender, address(this), assets);
-
         config.asset.approve(address(config.vault), assets);
+
         uint256 shares = config.vault.deposit(assets, receiver);
         if (shares == 0) {
-            // The vault has paused itself, now we have to refund the user.
-            // We do not revert here since we want the vault to be able to
-            // update it's pause state successfully.
-            SafeERC20.safeTransfer(config.asset, msg.sender, assets);
-            return 0;
+            _refund(config.asset, assets);
         }
-
         return shares;
+    }
+
+    function mint(uint256 shares, address receiver) external nonReentrant onlyKyc returns (uint256) {
+        Config storage config = _getConfig();
+
+        (uint256 assets,) = _getConfig().vault.calculateMintFee(shares);
+        SafeERC20.safeTransferFrom(config.asset, msg.sender, address(this), assets);
+        config.asset.approve(address(config.vault), assets);
+
+        uint256 assetsDeposited = config.vault.mint(shares, receiver);
+        if (assetsDeposited == 0) {
+            _refund(config.asset, assets);
+        }
+        return assetsDeposited;
+    }
+
+    function _refund(IERC20 asset, uint256 assets) internal {
+        // The vault has paused itself, now we have to refund the user.
+        // We do not revert here since we want the vault to be able to
+        // update it's pause state successfully.
+        SafeERC20.safeTransfer(asset, msg.sender, assets);
     }
 }

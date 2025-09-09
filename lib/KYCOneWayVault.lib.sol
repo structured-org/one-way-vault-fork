@@ -103,7 +103,7 @@ library KYCOneWayVaultHelpers {
             address(underlyingToken),
             "vTEST",
             "vSYMBOL",
-            10 ** underlyingToken.decimals(),
+            10 ** underlyingToken.decimals() * 2,
             address(wrapper)
         ));
         ERC1967Proxy vaultProxy = new ERC1967Proxy(address(vaultImplementation), vaultInitializeCall);
