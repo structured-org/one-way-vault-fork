@@ -26,7 +26,7 @@ contract KYCOneWayVaultTest is Test {
     Wrapper wrapper;
 
     function setUp() public {
-        vm.startPrank(OWNER);
+        vm.startPrank(OWNER, OWNER);
         (underlyingToken, depositAccount, zkMe, vault, wrapper) =
             KYCOneWayVaultHelpers.deployTestEnvironment(OWNER, STRATEGIST, PLATFORM, COOPERATOR);
     }
@@ -39,8 +39,8 @@ contract KYCOneWayVaultTest is Test {
         underlyingToken.transfer(USER, 1000);
         wrapper.allowUser(USER);
 
-        vm.startPrank(USER);
-        underlyingToken.approve(address(wrapper), 1000);
+        vm.startPrank(USER, USER);
+        underlyingToken.approve(address(vault), 1000);
 
         wrapper.deposit(150, USER);
 
@@ -57,13 +57,13 @@ contract KYCOneWayVaultTest is Test {
         underlyingToken.transfer(USER, 1000);
         wrapper.allowUser(USER);
 
-        vm.startPrank(USER);
+        vm.startPrank(USER, USER);
         underlyingToken.approve(address(wrapper), 100);
 
-        vm.startPrank(OWNER);
+        vm.startPrank(OWNER, OWNER);
         vault.updateWrapper(NEW_WRAPPER);
 
-        vm.startPrank(USER);
+        vm.startPrank(USER, USER);
         vm.expectRevert("Only wrapper allowed");
         wrapper.deposit(100, USER);
     }
@@ -71,7 +71,7 @@ contract KYCOneWayVaultTest is Test {
     function testDirectDepositForbidden() public {
         underlyingToken.transfer(USER, 1000);
 
-        vm.startPrank(USER);
+        vm.startPrank(USER, USER);
         vm.expectRevert("Only wrapper allowed");
         vault.deposit(100, USER);
     }
@@ -79,7 +79,7 @@ contract KYCOneWayVaultTest is Test {
     function testDirectMintForbidden() public {
         underlyingToken.transfer(USER, 1000);
 
-        vm.startPrank(USER);
+        vm.startPrank(USER, USER);
         vm.expectRevert("Only wrapper allowed");
         vault.mint(100, USER);
     }

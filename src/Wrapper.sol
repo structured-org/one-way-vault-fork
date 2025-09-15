@@ -4,24 +4,19 @@ pragma solidity ^0.8.28;
 
 import {OwnableUpgradeable} from "@openzeppelin-contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {Initializable} from "@openzeppelin-contracts-upgradeable/proxy/utils/Initializable.sol";
-import {ReentrancyGuardUpgradeable} from "@openzeppelin-contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin-contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {KYCOneWayVault} from './KYCOneWayVault.sol';
 import {IZkMe} from './IZkMe.sol';
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract Wrapper is
     Initializable,
     OwnableUpgradeable,
-    ReentrancyGuardUpgradeable,
     UUPSUpgradeable
 {
     struct Config {
         KYCOneWayVault vault;
         IZkMe zkMe;
         address cooperator;
-        IERC20 asset;
     }
 
     /**
@@ -72,7 +67,6 @@ contract Wrapper is
 
     function initialize(address _owner) external initializer {
         __Ownable_init(_owner);
-        __ReentrancyGuard_init();
         __UUPSUpgradeable_init();
     }
 
@@ -90,7 +84,6 @@ contract Wrapper is
         config.vault = KYCOneWayVault(_vault);
         config.zkMe = IZkMe(_zkMe);
         config.cooperator = _cooperator;
-        config.asset = IERC20(config.vault.asset());
     }
 
     function allowUser(address _user) external onlyOwner {
@@ -105,37 +98,11 @@ contract Wrapper is
         return _getAllowedUsers().allowedUsers[_user];
     }
 
-    function deposit(uint256 assets, address receiver) external nonReentrant onlyKyc returns (uint256) {
-        Config storage config = _getConfig();
-
-        SafeERC20.safeTransferFrom(config.asset, msg.sender, address(this), assets);
-        config.asset.approve(address(config.vault), assets);
-
-        uint256 shares = config.vault.deposit(assets, receiver);
-        if (shares == 0) {
-            _refund(config.asset, assets);
-        }
-        return shares;
+    function deposit(uint256 assets, address receiver) external onlyKyc returns (uint256) {
+        return _getConfig().vault.deposit(assets, receiver);
     }
 
-    function mint(uint256 shares, address receiver) external nonReentrant onlyKyc returns (uint256) {
-        Config storage config = _getConfig();
-
-        (uint256 assets,) = _getConfig().vault.calculateMintFee(shares);
-        SafeERC20.safeTransferFrom(config.asset, msg.sender, address(this), assets);
-        config.asset.approve(address(config.vault), assets);
-
-        uint256 assetsDeposited = config.vault.mint(shares, receiver);
-        if (assetsDeposited == 0) {
-            _refund(config.asset, assets);
-        }
-        return assetsDeposited;
-    }
-
-    function _refund(IERC20 asset, uint256 assets) internal {
-        // The vault has paused itself, now we have to refund the user.
-        // We do not revert here since we want the vault to be able to
-        // update it's pause state successfully.
-        SafeERC20.safeTransfer(asset, msg.sender, assets);
+    function mint(uint256 shares, address receiver) external onlyKyc returns (uint256) {
+        return _getConfig().vault.mint(shares, receiver);
     }
 }

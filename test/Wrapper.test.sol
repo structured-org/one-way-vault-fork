@@ -10,6 +10,7 @@ import {ZkMeMock} from "../src/mock/ZkMeMock.sol";
 import {Wrapper} from "../src/Wrapper.sol";
 import {IERC20Errors} from "@openzeppelin-contracts-5.2.0/interfaces/draft-IERC6093.sol";
 import {KYCOneWayVaultHelpers} from "../lib/KYCOneWayVault.lib.sol";
+import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
 contract WrapperTest is Test {
     address constant OWNER = address(1);
@@ -17,6 +18,7 @@ contract WrapperTest is Test {
     address constant PLATFORM = address(3);
     address constant COOPERATOR = address(4);
     address constant USER = address(5);
+    address constant USER2 = address(6);
 
     ERC20Mock underlyingToken;
     BaseAccount depositAccount;
@@ -25,7 +27,7 @@ contract WrapperTest is Test {
     Wrapper wrapper;
 
     function setUp() public {
-        vm.startPrank(OWNER);
+        vm.startPrank(OWNER, OWNER);
         (underlyingToken, depositAccount, zkMe, vault, wrapper) =
             KYCOneWayVaultHelpers.deployTestEnvironment(OWNER, STRATEGIST, PLATFORM, COOPERATOR);
     }
@@ -34,8 +36,11 @@ contract WrapperTest is Test {
         underlyingToken.transfer(USER, 1000);
         wrapper.allowUser(USER);
 
-        vm.startPrank(USER);
-        underlyingToken.approve(address(wrapper), 100);
+        vm.startPrank(USER, USER);
+        underlyingToken.approve(address(vault), 100);
+
+        vm.expectEmit(true, true, true, true);
+        emit IERC4626.Deposit(USER, USER, 100, 50);
         uint256 shares = wrapper.deposit(100, USER);
 
         assertEq(shares, 50);
@@ -48,8 +53,11 @@ contract WrapperTest is Test {
         underlyingToken.transfer(USER, 1000);
         zkMe.setApproved(COOPERATOR, USER, true);
 
-        vm.startPrank(USER);
-        underlyingToken.approve(address(wrapper), 100);
+        vm.startPrank(USER, USER);
+        underlyingToken.approve(address(vault), 100);
+
+        vm.expectEmit(true, true, true, true);
+        emit IERC4626.Deposit(USER, USER, 100, 50);
         uint256 shares = wrapper.deposit(100, USER);
 
         assertEq(shares, 50);
@@ -63,8 +71,11 @@ contract WrapperTest is Test {
         wrapper.allowUser(USER);
         zkMe.setApproved(COOPERATOR, USER, true);
 
-        vm.startPrank(USER);
-        underlyingToken.approve(address(wrapper), 100);
+        vm.startPrank(USER, USER);
+        underlyingToken.approve(address(vault), 100);
+
+        vm.expectEmit(true, true, true, true);
+        emit IERC4626.Deposit(USER, USER, 100, 50);
         uint256 shares = wrapper.deposit(100, USER);
 
         assertEq(shares, 50);
@@ -73,11 +84,28 @@ contract WrapperTest is Test {
         assertEq(underlyingToken.balanceOf(address(depositAccount)), 100);
     }
 
+    function testDepositSuccessCustomReceiver() public {
+        underlyingToken.transfer(USER, 1000);
+        wrapper.allowUser(USER);
+
+        vm.startPrank(USER, USER);
+        underlyingToken.approve(address(vault), 100);
+
+        vm.expectEmit(true, true, true, true);
+        emit IERC4626.Deposit(USER, USER2, 100, 50);
+        uint256 shares = wrapper.deposit(100, USER2);
+
+        assertEq(shares, 50);
+        assertEq(vault.balanceOf(USER2), 50);
+        assertEq(underlyingToken.balanceOf(USER), 900);
+        assertEq(underlyingToken.balanceOf(address(depositAccount)), 100);
+    }
+
     function testDepositFailureNoFunds() public {
         wrapper.allowUser(USER);
 
-        vm.startPrank(USER);
-        underlyingToken.approve(address(wrapper), 100);
+        vm.startPrank(USER, USER);
+        underlyingToken.approve(address(vault), 100);
 
         vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientBalance.selector, USER, 0, 100));
         wrapper.deposit(100, USER);
@@ -87,8 +115,8 @@ contract WrapperTest is Test {
         underlyingToken.transfer(USER, 50);
         wrapper.allowUser(USER);
 
-        vm.startPrank(USER);
-        underlyingToken.approve(address(wrapper), 100);
+        vm.startPrank(USER, USER);
+        underlyingToken.approve(address(vault), 100);
 
         vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientBalance.selector, USER, 50, 100));
         wrapper.deposit(100, USER);
@@ -97,39 +125,39 @@ contract WrapperTest is Test {
     function testDepositFailureNoAllowance() public {
         wrapper.allowUser(USER);
 
-        vm.startPrank(USER);
+        vm.startPrank(USER, USER);
 
-        vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, address(wrapper), 0, 100));
+        vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, address(vault), 0, 100));
         wrapper.deposit(100, USER);
     }
 
     function testDepositFailureNotEnoughAllowance() public {
         wrapper.allowUser(USER);
 
-        vm.startPrank(USER);
-        underlyingToken.approve(address(wrapper), 50);
+        vm.startPrank(USER, USER);
+        underlyingToken.approve(address(vault), 50);
 
-        vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, address(wrapper), 50, 100));
+        vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, address(vault), 50, 100));
         wrapper.deposit(100, USER);
     }
 
     function testDepositFailureKyc() public {
         underlyingToken.transfer(USER, 1000);
 
-        vm.startPrank(USER);
-        underlyingToken.approve(address(wrapper), 100);
+        vm.startPrank(USER, USER);
+        underlyingToken.approve(address(vault), 100);
 
         vm.expectRevert(Wrapper.KycFailed.selector);
         wrapper.deposit(100, USER);
     }
 
-    function testDepositRefund() public {
+    function testDepositStaleRatePause() public {
         underlyingToken.transfer(USER, 1000);
         wrapper.allowUser(USER);
 
         skip(10); // forwards time beyond maxRateUpdateDelay
-        vm.startPrank(USER);
-        underlyingToken.approve(address(wrapper), 100);
+        vm.startPrank(USER, USER);
+        underlyingToken.approve(address(vault), 100);
         uint256 shares = wrapper.deposit(100, USER);
 
         assertEq(shares, 0);
@@ -147,8 +175,11 @@ contract WrapperTest is Test {
         underlyingToken.transfer(USER, 1000);
         wrapper.allowUser(USER);
 
-        vm.startPrank(USER);
-        underlyingToken.approve(address(wrapper), 200);
+        vm.startPrank(USER, USER);
+        underlyingToken.approve(address(vault), 200);
+
+        vm.expectEmit(true, true, true, true);
+        emit IERC4626.Deposit(USER, USER, 200, 100);
         uint256 assets = wrapper.mint(100, USER);
 
         assertEq(assets, 200);
@@ -161,8 +192,11 @@ contract WrapperTest is Test {
         underlyingToken.transfer(USER, 1000);
         zkMe.setApproved(COOPERATOR, USER, true);
 
-        vm.startPrank(USER);
-        underlyingToken.approve(address(wrapper), 200);
+        vm.startPrank(USER, USER);
+        underlyingToken.approve(address(vault), 200);
+
+        vm.expectEmit(true, true, true, true);
+        emit IERC4626.Deposit(USER, USER, 200, 100);
         uint256 assets = wrapper.mint(100, USER);
 
         assertEq(assets, 200);
@@ -176,8 +210,11 @@ contract WrapperTest is Test {
         wrapper.allowUser(USER);
         zkMe.setApproved(COOPERATOR, USER, true);
 
-        vm.startPrank(USER);
-        underlyingToken.approve(address(wrapper), 200);
+        vm.startPrank(USER, USER);
+        underlyingToken.approve(address(vault), 200);
+
+        vm.expectEmit(true, true, true, true);
+        emit IERC4626.Deposit(USER, USER, 200, 100);
         uint256 assets = wrapper.mint(100, USER);
 
         assertEq(assets, 200);
@@ -186,11 +223,28 @@ contract WrapperTest is Test {
         assertEq(underlyingToken.balanceOf(address(depositAccount)), 200);
     }
 
+    function testMintSuccessCustomReceiver() public {
+        underlyingToken.transfer(USER, 1000);
+        wrapper.allowUser(USER);
+
+        vm.startPrank(USER, USER);
+        underlyingToken.approve(address(vault), 200);
+
+        vm.expectEmit(true, true, true, true);
+        emit IERC4626.Deposit(USER, USER2, 200, 100);
+        uint256 assets = wrapper.mint(100, USER2);
+
+        assertEq(assets, 200);
+        assertEq(vault.balanceOf(USER2), 100);
+        assertEq(underlyingToken.balanceOf(USER), 800);
+        assertEq(underlyingToken.balanceOf(address(depositAccount)), 200);
+    }
+
     function testMintFailureNoFunds() public {
         wrapper.allowUser(USER);
 
-        vm.startPrank(USER);
-        underlyingToken.approve(address(wrapper), 200);
+        vm.startPrank(USER, USER);
+        underlyingToken.approve(address(vault), 200);
 
         vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientBalance.selector, USER, 0, 200));
         wrapper.mint(100, USER);
@@ -200,8 +254,8 @@ contract WrapperTest is Test {
         underlyingToken.transfer(USER, 50);
         wrapper.allowUser(USER);
 
-        vm.startPrank(USER);
-        underlyingToken.approve(address(wrapper), 200);
+        vm.startPrank(USER, USER);
+        underlyingToken.approve(address(vault), 200);
 
         vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientBalance.selector, USER, 50, 200));
         wrapper.mint(100, USER);
@@ -210,39 +264,39 @@ contract WrapperTest is Test {
     function testMintFailureNoAllowance() public {
         wrapper.allowUser(USER);
 
-        vm.startPrank(USER);
+        vm.startPrank(USER, USER);
 
-        vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, address(wrapper), 0, 200));
+        vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, address(vault), 0, 200));
         wrapper.mint(100, USER);
     }
 
     function testMintFailureNotEnoughAllowance() public {
         wrapper.allowUser(USER);
 
-        vm.startPrank(USER);
-        underlyingToken.approve(address(wrapper), 50);
+        vm.startPrank(USER, USER);
+        underlyingToken.approve(address(vault), 50);
 
-        vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, address(wrapper), 50, 200));
+        vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, address(vault), 50, 200));
         wrapper.mint(100, USER);
     }
 
     function testMintFailureKyc() public {
         underlyingToken.transfer(USER, 1000);
 
-        vm.startPrank(USER);
-        underlyingToken.approve(address(wrapper), 200);
+        vm.startPrank(USER, USER);
+        underlyingToken.approve(address(vault), 200);
 
         vm.expectRevert(Wrapper.KycFailed.selector);
         wrapper.mint(100, USER);
     }
 
-    function testMintRefund() public {
+    function testMintStaleRatePause() public {
         underlyingToken.transfer(USER, 1000);
         wrapper.allowUser(USER);
 
         skip(10); // forwards time beyond maxRateUpdateDelay
-        vm.startPrank(USER);
-        underlyingToken.approve(address(wrapper), 200);
+        vm.startPrank(USER, USER);
+        underlyingToken.approve(address(vault), 200);
         uint256 assets = wrapper.deposit(100, USER);
 
         assertEq(assets, 0);

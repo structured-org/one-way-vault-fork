@@ -437,7 +437,7 @@ contract KYCOneWayVault is
         }
 
         uint256 shares = previewDeposit(assetsAfterFee);
-        _deposit(msg.sender, receiver, assets, shares);
+        _deposit(tx.origin, receiver, assets, shares);
 
         return shares;
     }
@@ -464,7 +464,7 @@ contract KYCOneWayVault is
             feesAccruedInAsset += fee;
         }
 
-        _deposit(msg.sender, receiver, grossAssets, shares);
+        _deposit(tx.origin, receiver, grossAssets, shares);
 
         return grossAssets;
     }
