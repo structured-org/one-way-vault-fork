@@ -16,7 +16,6 @@ contract DeployKYCOneWayVaultScript is Script {
         address underlyingToken = vm.envAddress("UNDERLYING_TOKEN");
         address depositAccount = vm.envAddress("DEPOSIT_ACCOUNT");
         address strategist = vm.envAddress("STRATEGIST");
-        address wrapper = vm.envAddress("WRAPPER");
         address platform = vm.envAddress("PLATFORM");
         uint256 strategistRatioBps = vm.envOr("STRATEGIST_RATIO_BPS", uint256(0));
         uint256 depositFeeBps = vm.envOr("DEPOSIT_FEE_BPS", uint256(0));
@@ -33,7 +32,7 @@ contract DeployKYCOneWayVaultScript is Script {
         uint256 startingRate = vm.envOr("STARTING_RATE", defaultStartingRate);
 
         KYCOneWayVault.FeeDistributionConfig memory feeConfig = KYCOneWayVault.FeeDistributionConfig({
-            strategistAccount: strategist, // TODO: probably should be a separate account?
+            strategistAccount: strategist,
             platformAccount: platform,
             strategistRatioBps: uint32(strategistRatioBps)
         });
@@ -57,8 +56,7 @@ contract DeployKYCOneWayVaultScript is Script {
             underlyingToken,
             vaultTokenName,
             vaultTokenSymbol,
-            startingRate,
-            wrapper
+            startingRate
         ));
 
         vm.startBroadcast();
@@ -71,7 +69,6 @@ contract DeployKYCOneWayVaultScript is Script {
         console.log("  Owner:                 ", owner);
         console.log("  Deposit account:       ", depositAccount);
         console.log("  Strategist:            ", strategist);
-        console.log("  Wrapper:               ", wrapper);
         console.log("  Deposit fee BPS:       ", depositFeeBps);
         console.log("  Withdraw fee BPS:      ", withdrawFeeBps);
         console.log("  Max rate increment BPS:", maxRateIncrementBps);
@@ -80,7 +77,7 @@ contract DeployKYCOneWayVaultScript is Script {
         console.log("  Max rate update delay: ", maxRateUpdateDelay);
         console.log("  Deposit cap:           ", depositCap);
         console.log("  Fee distribution:");
-        console.log("    Strategist account:    ", strategist); // TODO: probably should be a separate account?
+        console.log("    Strategist account:    ", strategist);
         console.log("    Platform account:      ", platform);
         console.log("    Strategist ratio BPS:  ", strategistRatioBps);
         console.log("  Underlying token:      ", underlyingToken);

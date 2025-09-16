@@ -11,6 +11,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {StorageSlot} from "@openzeppelin/contracts/utils/StorageSlot.sol";
+import {IZkMe} from './IZkMe.sol';
 
 /**
  * @title KYCOneWayVault
@@ -36,10 +37,24 @@ contract KYCOneWayVault is
     using Math for uint256;
 
     /**
-     * @notice Address of wrapper, the only account allowed to execute deposit() and withdraw()
-     * @dev bytes32(uint256(keccak256('kyc_one_way_vault.wrapper')) - 1)
+     * @dev bytes32(uint256(keccak256('kyc_one_way_vault.zkme_config')) - 1)
      */
-    bytes32 internal constant _WRAPPER_SLOT = 0x4716d747150b04699545244f6e6fb3e16948c6fec05693434a01f1b98f81bd93;
+    bytes32 internal constant _ZKME_CONFIG_SLOT = 0x6aa30f72c819d6ffdc11d4f73f6dbad58c3fe2ea745f3548ccd5eb0e816f9ff9;
+    function _getZkMeConfig() private pure returns (ZkMeConfig storage $) {
+        assembly {
+            $.slot := _ZKME_CONFIG_SLOT
+        }
+    }
+
+    /**
+     * @dev bytes32(uint256(keccak256('kyc_one_way_vault.kyc_allowed_users')) - 1)
+     */
+    bytes32 internal constant _KYC_ALLOWED_USERS_SLOT = 0x100924d8e5ab1df33616bfd25eded8b01d3d68d2ade2d07beeff707eff244277;
+    function _getKycAllowedUsers() private pure returns (KycAllowedUsers storage $) {
+        assembly {
+            $.slot := _KYC_ALLOWED_USERS_SLOT
+        }
+    }
 
     /**
      * @dev Emitted when the vault's paused state changes
@@ -91,6 +106,21 @@ contract KYCOneWayVault is
     event ConfigUpdated(address indexed updater, KYCOneWayVaultConfig newConfig);
 
     /**
+     * @dev Emitted when the zkMe configuration is updated
+     * @param updater Address that updated the config
+     * @param newConfig The new configuration
+     */
+    event ZkMeConfigUpdated(address indexed updater, ZkMeConfig newConfig);
+
+    /**
+     * @dev Emitted when the user is expliticly allowed or removed from explicitly allowed list
+     * @param updater Address that updated user status
+     * @param user Address, the explicit approval of which was altered
+     * @param allowed Whether this address is explicitly allowed or not
+     */
+    event UserAllowed(address indexed updater, address indexed user, bool allowed);
+
+    /**
      * @dev Restricts function access to only the strategist
      */
     modifier onlyStrategist() {
@@ -106,16 +136,6 @@ contract KYCOneWayVault is
     modifier onlyOwnerOrStrategist() {
         if (msg.sender != owner() && msg.sender != config.strategist) {
             revert("Only owner or strategist allowed");
-        }
-        _;
-    }
-
-    /**
-     * @dev Restricts function access to only wrapper
-     */
-    modifier onlyWrapper() {
-        if (msg.sender != StorageSlot.getAddressSlot(_WRAPPER_SLOT).value) {
-            revert("Only wrapper allowed");
         }
         _;
     }
@@ -138,6 +158,47 @@ contract KYCOneWayVault is
             revert("Vault is paused by owner or strategist");
         }
         _;
+    }
+
+    /**
+     * @dev Ensures that a function can only be called by either explicitly approved users
+     *      or by users who completed the zkMe KYC procedure
+     */
+    modifier onlyKyc() {
+        // First, check if user is explicitly approved inside of the KYC vault.
+        // Only then ask ZkMe if user is approved on its side.
+        // This order of execution saves gas, avoiding a call to ZkMe when possible.
+        if (
+            !_getKycAllowedUsers().allowedUsers[msg.sender] &&
+            !_getZkMeConfig().zkMe.hasApproved(_getZkMeConfig().cooperator, msg.sender)
+        ) {
+            revert KycFailed();
+        }
+
+        _;
+    }
+
+    /**
+     * @dev Returned when user failed to complete KYC
+     */
+    error KycFailed();
+
+    /**
+     * @dev Configuration structure for zkMe KYC service
+     * @param zkMe zkMe Verify & Certify contract address
+     * @param cooperator Selector address provided by zkMe
+     */
+    struct ZkMeConfig {
+        IZkMe zkMe;
+        address cooperator;
+    }
+
+    /**
+     * @dev Explicitly allowed users which don't have to go through KYC process
+     * @param allowedUsers Mapping which stores true if a user is allowed
+     */
+    struct KycAllowedUsers {
+        mapping(address => bool) allowedUsers;
     }
 
     /**
@@ -258,7 +319,6 @@ contract KYCOneWayVault is
      * @param vaultTokenName Name of the vault token
      * @param vaultTokenSymbol Symbol of the vault token
      * @param startingRate Initial redemption rate
-     * @param wrapper Address of the wrapper
      */
     function initialize(
         address _owner,
@@ -266,8 +326,7 @@ contract KYCOneWayVault is
         address underlying,
         string memory vaultTokenName,
         string memory vaultTokenSymbol,
-        uint256 startingRate,
-        address wrapper
+        uint256 startingRate
     ) external initializer {
         __ERC20_init(vaultTokenName, vaultTokenSymbol);
         __ERC4626_init(IERC20(underlying));
@@ -282,8 +341,6 @@ contract KYCOneWayVault is
         require(startingRate > 0, "Starting redemption rate cannot be zero");
         redemptionRate = startingRate; // Initialize at specified starting rate
         lastRateUpdateTimestamp = uint64(block.timestamp); // Set initial timestamp for rate updates
-
-        StorageSlot.getAddressSlot(_WRAPPER_SLOT).value = wrapper;
     }
 
     /**
@@ -312,11 +369,41 @@ contract KYCOneWayVault is
     }
 
     /**
-     * @dev Updates the wrapper
-     * @param _newWrapper New wrapper address
+     * @notice Updates the zkMe configuration
+     * @param _zkMe zkMe Verify & Certify contract address
+     * @param _cooperator Selector address provided by zkMe
      */
-    function updateWrapper(address _newWrapper) external onlyOwner {
-        StorageSlot.getAddressSlot(_WRAPPER_SLOT).value = _newWrapper;
+    function updateZkMeConfig(address _zkMe, address _cooperator) external onlyOwner {
+        ZkMeConfig storage zkMeConfig = _getZkMeConfig();
+
+        zkMeConfig.zkMe = IZkMe(_zkMe);
+        zkMeConfig.cooperator = _cooperator;
+
+        emit ZkMeConfigUpdated(msg.sender, zkMeConfig);
+    }
+
+    /**
+     * @notice Updates explicit user allowance to use this contract without KYC
+     * @param _user Address, which status shall be altered
+     * @param _allowed Whether this address is explicitly allowed or not
+     */
+    function setUserAllowed(address _user, bool _allowed) external onlyOwner {
+        if (_allowed) {
+            _getKycAllowedUsers().allowedUsers[_user] = true;
+        } else {
+            delete _getKycAllowedUsers().allowedUsers[_user];
+        }
+
+        emit UserAllowed(msg.sender, _user, _allowed);
+    }
+
+    /**
+     * @notice Returns explicit user allowance to use this contract without KYC
+     * @param _user Address, status of which to retrieve
+     * @return Whether this address is explicitly allowed or not
+     */
+    function userAllowed(address _user) external view returns (bool) {
+        return _getKycAllowedUsers().allowedUsers[_user];
     }
 
     /**
@@ -419,7 +506,7 @@ contract KYCOneWayVault is
      * @param receiver Address to receive the vault shares
      * @return shares Amount of shares minted to receiver
      */
-    function deposit(uint256 assets, address receiver) public override onlyWrapper whenNotPaused nonReentrant returns (uint256) {
+    function deposit(uint256 assets, address receiver) public override onlyKyc whenNotPaused nonReentrant returns (uint256) {
         if (_checkAndHandleStaleRate()) {
             return 0; // Exit early if vault was just paused
         }
@@ -449,7 +536,7 @@ contract KYCOneWayVault is
      * @param receiver Address to receive the shares
      * @return assets Total amount of assets deposited (including fees)
      */
-    function mint(uint256 shares, address receiver) public override onlyWrapper whenNotPaused nonReentrant returns (uint256) {
+    function mint(uint256 shares, address receiver) public override onlyKyc whenNotPaused nonReentrant returns (uint256) {
         if (_checkAndHandleStaleRate()) {
             return 0; // Exit early if vault was just paused
         }
