@@ -6,7 +6,6 @@ import {KYCOneWayVault} from "../src/KYCOneWayVault.sol";
 import {BaseAccount} from "../src/BaseAccount.sol";
 import {ERC20Mock} from "../src/mock/ERC20Mock.sol";
 import {ZkMeMock} from "../src/mock/ZkMeMock.sol";
-import {Wrapper} from "../src/Wrapper.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 library KYCOneWayVaultHelpers {
@@ -59,8 +58,7 @@ library KYCOneWayVaultHelpers {
         ERC20Mock underlyingToken,
         BaseAccount depositAccount,
         ZkMeMock zkMe,
-        KYCOneWayVault vault,
-        Wrapper wrapper
+        KYCOneWayVault vault
     ) {
         underlyingToken = new ERC20Mock();
         zkMe = new ZkMeMock();
@@ -69,17 +67,9 @@ library KYCOneWayVaultHelpers {
         KYCOneWayVault vaultImplementation = new KYCOneWayVault();
 
         // README step 3
-        Wrapper wrapperImplementation = new Wrapper();
-
-        // README step 4
         depositAccount = new BaseAccount(owner, new address[](0));
 
-        // README step 5
-        bytes memory wrapperInitializeCall = abi.encodeCall(Wrapper.initialize, (owner));
-        ERC1967Proxy wrapperProxy = new ERC1967Proxy(address(wrapperImplementation), wrapperInitializeCall);
-        wrapper = Wrapper(address(wrapperProxy));
-
-        // README step 6
+        // README step 4
         KYCOneWayVault.FeeDistributionConfig memory feeConfig = KYCOneWayVault.FeeDistributionConfig({
             strategistAccount: strategist,
             platformAccount: platform,
@@ -103,13 +93,12 @@ library KYCOneWayVaultHelpers {
             address(underlyingToken),
             "vTEST",
             "vSYMBOL",
-            10 ** underlyingToken.decimals() * 2,
-            address(wrapper)
+            10 ** underlyingToken.decimals() * 2
         ));
         ERC1967Proxy vaultProxy = new ERC1967Proxy(address(vaultImplementation), vaultInitializeCall);
         vault = KYCOneWayVault(address(vaultProxy));
 
-        // README step 7
-        wrapper.setConfig(address(vault), address(zkMe), cooperator);
+        // README step 5
+        vault.updateZkMeConfig(address(zkMe), cooperator);
     }
 }
