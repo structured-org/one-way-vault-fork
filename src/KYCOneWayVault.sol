@@ -414,6 +414,8 @@ contract KYCOneWayVault is
      */
     function updateBurner(address _burner) external onlyOwner {
         StorageSlot.getAddressSlot(_BURNER_SLOT).value = _burner;
+
+        emit BurnerUpdated(msg.sender, _burner);
     }
 
     /**
