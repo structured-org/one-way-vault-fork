@@ -56,6 +56,9 @@ contract KYCOneWayVault is
         }
     }
 
+    /// @dev bytes32(uint256(keccak256('kyc_one_way_vault.burner')) - 1)
+    bytes32 internal constant _BURNER_SLOT = 0x4ec0824ff6610247c395134309dc7853114f07ea42b058f82badaf53d8251a91;
+
     /**
      * @dev Emitted when the vault's paused state changes
      * @param paused New paused state
@@ -111,6 +114,13 @@ contract KYCOneWayVault is
      * @param newConfig The new configuration
      */
     event ZkMeConfigUpdated(address indexed updater, ZkMeConfig newConfig);
+
+    /**
+     * @dev Emitted when burner address is updated
+     * @param updater Address that updated the burner
+     * @param newBurner Address of new burner
+     */
+    event BurnerUpdated(address indexed updater, address newBurner);
 
     /**
      * @dev Emitted when the user is expliticly allowed or removed from explicitly allowed list
@@ -179,9 +189,25 @@ contract KYCOneWayVault is
     }
 
     /**
+     * @dev Ensures that a function can only be called by a specially designated
+     *      burner role.
+     */
+    modifier onlyBurner() {
+        if (StorageSlot.getAddressSlot(_BURNER_SLOT).value != msg.sender) {
+            revert OnlyBurnerAllowed();
+        }
+        _;
+    }
+
+    /**
      * @dev Returned when user failed to complete KYC
      */
     error KycFailed();
+
+    /**
+     * @dev Returned when called by address which is not a burner
+     */
+    error OnlyBurnerAllowed();
 
     /**
      * @dev Configuration structure for zkMe KYC service
@@ -380,6 +406,16 @@ contract KYCOneWayVault is
         zkMeConfig.cooperator = _cooperator;
 
         emit ZkMeConfigUpdated(msg.sender, zkMeConfig);
+    }
+
+    /**
+     * @notice Updates burner role address
+     * @param _burner New burner address
+     */
+    function updateBurner(address _burner) external onlyOwner {
+        StorageSlot.getAddressSlot(_BURNER_SLOT).value = _burner;
+
+        emit BurnerUpdated(msg.sender, _burner);
     }
 
     /**
@@ -779,6 +815,15 @@ contract KYCOneWayVault is
 
         // Burn the full shares amount specified by user, store net shares in request
         _withdraw(shares, postFeeShares, receiver, owner);
+    }
+
+    /**
+     * @notice Allows burner role to burn shares, lowering total supply
+     * @param burnAddress Address which holds shares to be burned
+     * @param shares Amount of shares to burn
+     */
+    function burn(address burnAddress, uint256 shares) external onlyBurner {
+        _burn(burnAddress, shares);
     }
 
     /**
