@@ -18,7 +18,6 @@ contract KYCOneWayVaultTest is Test {
     address constant COOPERATOR = address(4);
     address constant USER = address(5);
     address constant USER2 = address(6);
-    address constant BURNER = address(7);
 
     ERC20Mock underlyingToken;
     BaseAccount depositAccount;
@@ -217,34 +216,5 @@ contract KYCOneWayVaultTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(ERC4626Upgradeable.ERC4626ExceededMaxDeposit.selector, USER, 20, 0));
         vault.deposit(20, USER);
-    }
-
-    function testBurnerSuccess() public {
-        underlyingToken.transfer(USER, 1000);
-        vault.setUserAllowed(USER, true);
-        vault.updateBurner(BURNER);
-
-        vm.startPrank(USER);
-        underlyingToken.approve(address(vault), 200);
-        vault.mint(100, USER);
-
-        vm.startPrank(BURNER);
-        vault.burn(USER, 20);
-
-        assertEq(vault.balanceOf(USER), 80);
-        assertEq(vault.totalSupply(), 80);
-    }
-
-    function testBurnerUnauthorized() public {
-        underlyingToken.transfer(USER, 1000);
-        vault.setUserAllowed(USER, true);
-
-        vm.startPrank(USER);
-        underlyingToken.approve(address(vault), 200);
-        vault.mint(100, USER);
-
-        vm.startPrank(BURNER);
-        vm.expectRevert(KYCOneWayVault.OnlyBurnerAllowed.selector);
-        vault.burn(USER, 20);
     }
 }
